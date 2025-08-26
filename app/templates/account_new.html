@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="card">
+  <h3>Adicionar conta</h3>
+  <form method="post" action="/accounts">
+    <label>Telefone (com +código do país)
+      <input name="phone" placeholder="+55 11 99999-9999" required />
+    </label>
+    <button>Criar & Enviar código</button>
+  </form>
+</div>
+{% endblock %}

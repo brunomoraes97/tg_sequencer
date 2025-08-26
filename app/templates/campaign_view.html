@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block content %}
+{% if not campaign %}
+<p>Campanha não encontrada.</p>
+{% else %}
+<div class="card">
+  <h3>Campanha: {{campaign.name}}</h3>
+  <p>Conta: {{campaign.account_id}} | Intervalo: {{campaign.interval_seconds}}s | Passos: {{campaign.max_steps}}</p>
+  <h4>Passos</h4>
+  <ul>
+  {% for s in steps %}
+    <li>Step {{s.step_number}}: {{s.message}}</li>
+  {% endfor %}
+  </ul>
+  <form method="post" action="/campaigns/{{campaign.id}}/steps">
+    <label>Step #
+      <input type="number" name="step_number" min="1" required />
+    </label>
+    <label>Mensagem
+      <textarea name="message" rows="3" required></textarea>
+    </label>
+    <button>Adicionar passo</button>
+  </form>
+</div>
+
+<div class="card">
+  <h3>Contatos (da conta)</h3>
+  <table>
+    <tr><th>telegram_user_id</th><th>step</th><th>replied</th><th>last_message_at</th></tr>
+    {% for c in contacts %}
+    <tr>
+      <td>{{c.telegram_user_id}}</td>
+      <td>{{c.current_step}}</td>
+      <td>{{'✅' if c.replied else '❌'}}</td>
+      <td>{{c.last_message_at}}</td>
+    </tr>
+    {% endfor %}
+  </table>
+</div>
+{% endif %}
+{% endblock %}

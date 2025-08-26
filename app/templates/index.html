@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="card">
+  <h3>Contas</h3>
+  <table>
+    <tr><th>ID</th><th>Telefone</th><th>Status</th></tr>
+    {% for a in accounts %}
+    <tr><td>{{a.id}}</td><td>{{a.phone}}</td><td>{{a.status}}</td></tr>
+    {% endfor %}
+  </table>
+</div>
+
+<div class="card">
+  <h3>Campanhas</h3>
+  <table>
+    <tr><th>Nome</th><th>Conta</th><th>Intervalo (s)</th><th>Passos</th><th>Ativa</th></tr>
+    {% for c in campaigns %}
+    <tr>
+      <td><a href="/campaigns/{{c.id}}">{{c.name}}</a></td>
+      <td>{{c.account_id}}</td>
+      <td>{{c.interval_seconds}}</td>
+      <td>{{c.max_steps}}</td>
+      <td>{{'✅' if c.active else '❌'}}</td>
+    </tr>
+    {% endfor %}
+  </table>
+</div>
+{% endblock %}

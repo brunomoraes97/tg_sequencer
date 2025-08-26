@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="card">
+  <h3>Verificar conta</h3>
+  <p>Conta: <b>{{account.phone}}</b></p>
+  <form method="post" action="/accounts/{{account.id}}/verify">
+    <label>Código recebido por Telegram/SMS
+      <input name="code" placeholder="12345" required />
+    </label>
+    <label>Senha 2FA (se houver)
+      <input name="password" type="password" />
+    </label>
+    <button>Validar</button>
+  </form>
+</div>
+{% endblock %}

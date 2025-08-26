@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="card">
+  <h3>Novo contato</h3>
+  <form method="post" action="/contacts">
+    <label>Conta
+      <select name="account_id" required>
+        {% for a in accounts %}
+          <option value="{{a.id}}">{{a.phone}} ({{a.id}})</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>telegram_user_id
+      <input type="number" name="telegram_user_id" required />
+    </label>
+    <button>Salvar</button>
+  </form>
+</div>
+{% endblock %}

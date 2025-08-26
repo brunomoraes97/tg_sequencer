@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="card">
+  <h3>Nova campanha</h3>
+  <form method="post" action="/campaigns">
+    <label>Conta
+      <select name="account_id" required>
+        {% for a in accounts %}
+          <option value="{{a.id}}">{{a.phone}} ({{a.id}})</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>Nome
+      <input name="name" placeholder="Follow-up de onboarding" required />
+    </label>
+    <label>Intervalo (segundos)
+      <input type="number" name="interval_seconds" value="120" min="10" required />
+    </label>
+    <label>Máximo de passos
+      <input type="number" name="max_steps" value="3" min="1" required />
+    </label>
+    <button>Criar</button>
+  </form>
+</div>
+{% endblock %}
