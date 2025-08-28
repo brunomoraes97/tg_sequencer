@@ -1,6 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { contactsAPI, Contact, Account, accountsAPI, Campaign, campaignsAPI } from '../api';
 import ContactForm from './ContactForm';
+import { useToast } from '../contexts/ToastContext';
+import Alert from './Alert';
+import SearchFilters from './SearchFilters';
 
 const ContactsPage: React.FC = () => {
   const [contacts, setContacts] = useState<Contact[]>([]);
@@ -10,6 +13,11 @@ const ContactsPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [editingContact, setEditingContact] = useState<Contact | null>(null);
   const [showCreateForm, setShowCreateForm] = useState(false);
+  const [showAlert, setShowAlert] = useState(true);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [campaignFilter, setCampaignFilter] = useState('all');
+  const { showSuccess, showError } = useToast();
   const [editForm, setEditForm] = useState({ name: '', tag: '' });
 
   const loadContacts = async () => {
@@ -122,6 +130,57 @@ const ContactsPage: React.FC = () => {
     return '📤 In Progress';
   };
 
+  // Filter and search logic
+  const filteredContacts = useMemo(() => {
+    return contacts.filter(contact => {
+      // Search filter
+      if (searchTerm) {
+        const searchLower = searchTerm.toLowerCase();
+        const matchesName = contact.name?.toLowerCase().includes(searchLower);
+        const matchesTag = contact.tag?.toLowerCase().includes(searchLower);
+        const matchesUserId = contact.telegram_user_id.toString().includes(searchTerm);
+        
+        if (!matchesName && !matchesTag && !matchesUserId) {
+          return false;
+        }
+      }
+
+      // Status filter
+      if (statusFilter !== 'all') {
+        if (statusFilter === 'replied' && !contact.replied) return false;
+        if (statusFilter === 'active' && contact.replied) return false;
+        if (statusFilter === 'completed') {
+          const campaign = campaigns.find(c => c.account_id === contact.account_id && c.active);
+          const maxSteps = campaign ? campaign.max_steps : 3;
+          if (contact.current_step < maxSteps && !contact.replied) return false;
+        }
+      }
+
+      // Campaign filter
+      if (campaignFilter !== 'all') {
+        const campaign = campaigns.find(c => c.account_id === contact.account_id);
+        if (!campaign || campaign.id !== campaignFilter) return false;
+      }
+
+      return true;
+    });
+  }, [contacts, searchTerm, statusFilter, campaignFilter, campaigns]);
+
+  const filterOptions = [
+    { value: 'all', label: 'Todos os Status' },
+    { value: 'active', label: 'Em Progresso' },
+    { value: 'replied', label: 'Responderam' },
+    { value: 'completed', label: 'Concluídos' }
+  ];
+
+  const campaignOptions = [
+    { value: 'all', label: 'Todas as Campanhas' },
+    ...campaigns.map(campaign => ({
+      value: campaign.id,
+      label: campaign.name
+    }))
+  ];
+
   if (loading) return <div className="loading">Loading contacts...</div>;
 
   return (
@@ -136,6 +195,38 @@ const ContactsPage: React.FC = () => {
           ➕ New Contact
         </button>
       </div>
+
+      {showAlert && (
+        <Alert
+          type="success"
+          title="Gestão de Contatos"
+          message="Acompanhe o progresso das suas sequências e veja quais contatos precisam de atenção."
+          onClose={() => setShowAlert(false)}
+        />
+      )}
+
+      <SearchFilters
+        onSearch={setSearchTerm}
+        onFilterChange={(filters) => {
+          setStatusFilter(filters.status || 'all');
+          setCampaignFilter(filters.campaign || 'all');
+        }}
+        placeholder="Buscar por nome, tag ou ID do usuário..."
+        filters={[
+          {
+            key: 'status',
+            label: 'Status',
+            type: 'select',
+            options: filterOptions
+          },
+          {
+            key: 'campaign',
+            label: 'Campanha',
+            type: 'select',
+            options: campaignOptions
+          }
+        ]}
+      />
 
       {error && <div className="error">{error}</div>}
 
@@ -156,7 +247,23 @@ const ContactsPage: React.FC = () => {
       )}
 
       <div className="contacts-grid">
-        {contacts.map(contact => (
+        {filteredContacts.length === 0 ? (
+          <div className="empty-state">
+            <h3>Nenhum contato encontrado</h3>
+            <p>
+              {contacts.length === 0 
+                ? 'Adicione seu primeiro contato para começar o follow-up.'
+                : 'Tente ajustar os filtros de busca.'
+              }
+            </p>
+            {contacts.length === 0 && (
+              <button className="btn btn-primary" onClick={() => setShowCreateForm(true)}>
+                Adicionar Primeiro Contato
+              </button>
+            )}
+          </div>
+        ) : (
+          filteredContacts.map(contact => (
           <div key={contact.id} className="contact-card">
             <div className="contact-header">
               <h3>
@@ -210,15 +317,9 @@ const ContactsPage: React.FC = () => {
               </button>
             </div>
           </div>
-        ))}
+        ))
+        )}
       </div>
-
-      {contacts.length === 0 && !loading && (
-        <div className="empty-state">
-          <h3>No contacts found</h3>
-          <p>Add your first contact to start managing follow-ups.</p>
-        </div>
-      )}
 
       {editingContact && (
         <div className="modal-overlay">

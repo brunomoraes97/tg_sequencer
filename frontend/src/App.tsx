@@ -10,6 +10,7 @@ import AccountsPage from './components/AccountsPage';
 import CampaignsPage from './components/CampaignsPage';
 import ContactsPage from './components/ContactsPage';
 import HelpPage from './components/HelpPage';
+import { ToastProvider } from './contexts/ToastContext';
 
 type View = 'dashboard' | 'accounts' | 'campaigns' | 'contacts' | 'help';
 
@@ -42,7 +43,8 @@ function App() {
   };
 
   return (
-    <div className="App">
+    <ToastProvider>
+      <div className="App">
       <header className="App-header">
         <h1>🚀 Telegram Follow-up System</h1>
         <nav>
@@ -98,7 +100,8 @@ function App() {
         {view === 'contacts' && <ContactsPage />}
         {view === 'help' && <HelpPage />}
       </main>
-    </div>
+      </div>
+    </ToastProvider>
   );
 }
 

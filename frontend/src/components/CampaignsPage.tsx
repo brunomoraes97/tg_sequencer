@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { campaignsAPI, Campaign, Account, accountsAPI } from '../api';
 import CampaignForm from './CampaignForm';
+import { useToast } from '../contexts/ToastContext';
+import Alert from './Alert';
 
 const CampaignsPage: React.FC = () => {
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
@@ -9,6 +11,8 @@ const CampaignsPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [editingCampaign, setEditingCampaign] = useState<Campaign | null>(null);
   const [showCreateForm, setShowCreateForm] = useState(false);
+  const [showAlert, setShowAlert] = useState(true);
+  const { showSuccess, showError } = useToast();
   const [editForm, setEditForm] = useState({
     name: '',
     account_id: '',
@@ -26,7 +30,9 @@ const CampaignsPage: React.FC = () => {
       setCampaigns(campaignsData);
       setAccounts(accountsData);
     } catch (err: any) {
-      setError(err.response?.data?.detail || 'Error loading campaigns');
+      const errorMessage = err.response?.data?.detail || 'Erro ao carregar campanhas';
+      setError(errorMessage);
+      showError('Erro', errorMessage);
     } finally {
       setLoading(false);
     }
@@ -52,20 +58,26 @@ const CampaignsPage: React.FC = () => {
       const updated = await campaignsAPI.updateCampaign(editingCampaign.id, editForm);
       setCampaigns(campaigns.map(camp => camp.id === updated.id ? updated : camp));
       setEditingCampaign(null);
+      showSuccess('Sucesso', 'Campanha atualizada com sucesso!');
     } catch (err: any) {
-      setError(err.response?.data?.detail || 'Error updating campaign');
+      const errorMessage = err.response?.data?.detail || 'Erro ao atualizar campanha';
+      setError(errorMessage);
+      showError('Erro', errorMessage);
     }
   };
 
     const handleDelete = async (id: string) => {
     // eslint-disable-next-line no-restricted-globals
-    if (!confirm('Are you sure you want to delete this campaign?')) return;
+    if (!confirm('Tem certeza que deseja excluir esta campanha?')) return;
 
     try {
       await campaignsAPI.deleteCampaign(id);
       setCampaigns(campaigns.filter(camp => camp.id !== id));
+      showSuccess('Sucesso', 'Campanha excluída com sucesso!');
     } catch (err: any) {
-      setError(err.response?.data?.detail || 'Error deleting campaign');
+      const errorMessage = err.response?.data?.detail || 'Erro ao excluir campanha';
+      setError(errorMessage);
+      showError('Erro', errorMessage);
     }
   };
 
@@ -110,6 +122,15 @@ const CampaignsPage: React.FC = () => {
           ➕ New Campaign
         </button>
       </div>
+
+      {showAlert && (
+        <Alert
+          type="info"
+          title="Dica de Produtividade"
+          message="Use campanhas para automatizar suas sequências de mensagens e aumentar o engajamento com seus contatos."
+          onClose={() => setShowAlert(false)}
+        />
+      )}
 
       {error && <div className="error">{error}</div>}
 

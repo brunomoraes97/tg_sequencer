@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { DashboardData } from '../api';
 
 interface DashboardProps {
@@ -7,6 +7,39 @@ interface DashboardProps {
 }
 
 const Dashboard: React.FC<DashboardProps> = ({ data, onRefresh }) => {
+  // Calculate metrics
+  const metrics = useMemo(() => {
+    const totalContacts = data.contacts.length;
+    const repliedContacts = data.contacts.filter(c => c.replied).length;
+    const activeContacts = data.contacts.filter(c => !c.replied).length;
+    const activeCampaigns = data.campaigns.filter(c => c.active).length;
+    const activeAccounts = data.accounts.filter(a => a.status === 'active').length;
+    
+    // Contacts due for next message
+    const contactsDue = data.contacts.filter(contact => {
+      if (contact.replied) return false;
+      if (!contact.last_message_at) return true;
+      
+      const campaign = data.campaigns.find(c => c.account_id === contact.account_id && c.active);
+      if (!campaign || contact.current_step >= campaign.max_steps) return false;
+      
+      const lastMessage = new Date(contact.last_message_at);
+      const nextMessage = new Date(lastMessage.getTime() + (campaign.interval_seconds * 1000));
+      return nextMessage <= new Date();
+    }).length;
+    
+    const replyRate = totalContacts > 0 ? (repliedContacts / totalContacts * 100).toFixed(1) : '0';
+    
+    return {
+      totalContacts,
+      repliedContacts,
+      activeContacts,
+      activeCampaigns,
+      activeAccounts,
+      contactsDue,
+      replyRate
+    };
+  }, [data]);
   const formatDate = (dateStr?: string) => {
     if (!dateStr) return 'N/A';
     return new Date(dateStr).toLocaleString();
@@ -42,6 +75,69 @@ const Dashboard: React.FC<DashboardProps> = ({ data, onRefresh }) => {
         <h2>📊 System Overview</h2>
         <button onClick={onRefresh} className="btn btn-primary">🔄 Refresh</button>
       </div>
+
+      {/* Key Metrics */}
+      <section className="metrics-grid">
+        <div className="metric-card">
+          <div className="metric-icon">📱</div>
+          <div className="metric-content">
+            <h3>{metrics.activeAccounts}</h3>
+            <p>Active Accounts</p>
+          </div>
+        </div>
+        
+        <div className="metric-card">
+          <div className="metric-icon">🎯</div>
+          <div className="metric-content">
+            <h3>{metrics.activeCampaigns}</h3>
+            <p>Active Campaigns</p>
+          </div>
+        </div>
+        
+        <div className="metric-card">
+          <div className="metric-icon">👥</div>
+          <div className="metric-content">
+            <h3>{metrics.totalContacts}</h3>
+            <p>Total Contacts</p>
+          </div>
+        </div>
+        
+        <div className="metric-card urgent">
+          <div className="metric-icon">🔥</div>
+          <div className="metric-content">
+            <h3>{metrics.contactsDue}</h3>
+            <p>Due Now</p>
+          </div>
+        </div>
+        
+        <div className="metric-card success">
+          <div className="metric-icon">✅</div>
+          <div className="metric-content">
+            <h3>{metrics.repliedContacts}</h3>
+            <p>Replied</p>
+          </div>
+        </div>
+        
+        <div className="metric-card">
+          <div className="metric-icon">📈</div>
+          <div className="metric-content">
+            <h3>{metrics.replyRate}%</h3>
+            <p>Reply Rate</p>
+          </div>
+        </div>
+      </section>
+
+      {/* Quick Actions */}
+      {metrics.contactsDue > 0 && (
+        <section className="alert-section">
+          <div className="alert alert-warning">
+            <span className="alert-icon">⚠️</span>
+            <div className="alert-content">
+              <strong>Action Required:</strong> {metrics.contactsDue} contacts are due for their next message.
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* Accounts Section */}
       <section className="dashboard-section">
