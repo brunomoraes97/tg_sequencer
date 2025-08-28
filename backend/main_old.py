@@ -1,20 +1,28 @@
 from __future__ import annotations
 import os, uuid
 from fastapi import FastAPI, Request, Depends, Form, HTTPException
-from fastapi.responses import RedirectResponse, HTMLResponse
-from fastapi.staticfiles import StaticFiles
-from fastapi.templating import Jinja2Templates
+from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from sqlalchemy import select
+from datetime import datetime, timedelta
+from typing import List, Dict, Any
 
 # Use absolute imports
 from db import SessionLocal
 from models import Account, Campaign, CampaignStep, Contact
 from telethon_manager import MANAGER, _xor, SESSION_SECRET
+from schemas import *
 
-app = FastAPI(title="Telegram Follow-up UI")
-app.mount("/static", StaticFiles(directory="static"), name="static")
-templates = Jinja2Templates(directory="templates")
+app = FastAPI(title="Telegram Follow-up API")
+
+# Add CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000"],  # React dev server
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # Dependency
 

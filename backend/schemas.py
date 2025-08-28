@@ -1,0 +1,85 @@
+from pydantic import BaseModel
+from typing import Optional, List
+from datetime import datetime
+
+# Account schemas
+class AccountCreate(BaseModel):
+    phone: str
+
+class AccountVerify(BaseModel):
+    code: str
+    password: Optional[str] = None
+
+class AccountResponse(BaseModel):
+    id: str
+    phone: str
+    status: str
+    created_at: Optional[datetime]
+    
+    class Config:
+        from_attributes = True
+
+# Campaign schemas
+class CampaignStepCreate(BaseModel):
+    step_number: int
+    message: str
+
+class CampaignStepResponse(BaseModel):
+    id: str
+    step_number: int
+    message: str
+    
+    class Config:
+        from_attributes = True
+
+class CampaignCreate(BaseModel):
+    account_id: str
+    name: str
+    interval_seconds: int = 86400
+    max_steps: int = 3
+
+class CampaignResponse(BaseModel):
+    id: str
+    account_id: str
+    name: str
+    interval_seconds: int
+    max_steps: int
+    active: bool
+    steps: List[CampaignStepResponse] = []
+    
+    class Config:
+        from_attributes = True
+
+# Contact schemas
+class ContactCreate(BaseModel):
+    account_id: str
+    identifier: str  # username or phone
+
+class UserInfo(BaseModel):
+    id: int
+    first_name: Optional[str]
+    last_name: Optional[str]
+    username: Optional[str]
+    phone: Optional[str]
+    is_bot: bool
+    is_verified: bool
+    full_name: str
+
+class ContactResponse(BaseModel):
+    id: str
+    account_id: str
+    telegram_user_id: int
+    current_step: int
+    replied: bool
+    last_message_at: Optional[datetime]
+    user_info: Optional[UserInfo] = None
+    next_message_time: Optional[str] = None
+    
+    class Config:
+        from_attributes = True
+
+# Dashboard schema
+class DashboardResponse(BaseModel):
+    accounts: List[AccountResponse]
+    campaigns: List[CampaignResponse] 
+    contacts: List[ContactResponse]

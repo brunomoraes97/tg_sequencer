@@ -122,3 +122,5 @@ venv.bak/
 /logs/
 
 .env
+
+node_modules/
