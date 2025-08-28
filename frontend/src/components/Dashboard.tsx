@@ -59,65 +59,43 @@ const Dashboard: React.FC<DashboardProps> = ({ data, onRefresh }) => {
   const getNextMessageStatus = (contact: any) => {
     // If contact has replied, no next message
     if (contact.replied) {
-      return <span className="badge badge-success">✅ Replied - Complete</span>;
+      return <span className="text-muted">Replied - Complete</span>;
     }
     
     // Find the campaign for this contact
     const campaign = data.campaigns.find(c => c.account_id === contact.account_id && c.active);
     if (!campaign) {
-      return <span className="badge badge-error">❌ No Active Campaign</span>;
+      return <span className="text-muted">No Active Campaign</span>;
     }
     
     // Check if contact exceeded max steps
     if (contact.current_step >= campaign.max_steps) {
-      return <span className="badge badge-success">✅ Campaign Complete</span>;
+      return <span className="text-muted">Campaign Complete</span>;
     }
     
     // If no last message, next message is now
     if (!contact.last_message_at) {
-      return <span className="badge badge-urgent">� Ready to Send First Message</span>;
+      return <span>Now</span>;
     }
     
     try {
       const lastMessage = new Date(contact.last_message_at);
       const nextMessage = new Date(lastMessage.getTime() + (campaign.interval_seconds * 1000));
-      const now = new Date();
-      
-      const diff = nextMessage.getTime() - now.getTime();
       
       // Format date and time
-      const dateStr = nextMessage.toLocaleDateString('en-US', { 
-        weekday: 'short',
-        month: 'short', 
-        day: 'numeric',
-        year: nextMessage.getFullYear() !== now.getFullYear() ? 'numeric' : undefined
+      const dateStr = nextMessage.toLocaleDateString('pt-BR', { 
+        day: '2-digit',
+        month: '2-digit',
+        year: nextMessage.getFullYear() !== new Date().getFullYear() ? 'numeric' : undefined
       });
-      const timeStr = nextMessage.toLocaleTimeString('en-US', { 
+      const timeStr = nextMessage.toLocaleTimeString('pt-BR', { 
         hour: '2-digit', 
-        minute: '2-digit',
-        hour12: true
+        minute: '2-digit'
       });
       
-      const fullDateTime = `${dateStr} at ${timeStr}`;
-      
-      if (diff < 0) {
-        return <span className="badge badge-urgent">🔴 Overdue: {fullDateTime}</span>;
-      }
-      if (diff < 60 * 1000) {
-        return <span className="badge badge-warning">🟡 Due Now: {fullDateTime}</span>;
-      }
-      if (diff < 60 * 60 * 1000) {
-        const minutes = Math.round(diff / (60 * 1000));
-        return <span className="badge badge-warning">🟡 Due in {minutes}min: {fullDateTime}</span>;
-      }
-      if (diff < 24 * 60 * 60 * 1000) {
-        const hours = Math.round(diff / (60 * 60 * 1000));
-        return <span className="badge badge-info">🟢 Due in {hours}h: {fullDateTime}</span>;
-      }
-      
-      return <span className="badge badge-info">� Scheduled: {fullDateTime}</span>;
+      return <span>{dateStr} às {timeStr}</span>;
     } catch {
-      return <span className="badge badge-error">❌ Invalid Date</span>;
+      return <span className="text-muted">Invalid Date</span>;
     }
   };
 
@@ -293,11 +271,18 @@ const Dashboard: React.FC<DashboardProps> = ({ data, onRefresh }) => {
                         </div>
                       </td>
                       <td>{contact.telegram_user_id}</td>
-                      <td>{contact.current_step}/{campaign?.max_steps || 'N/A'}</td>
+                      <td>
+                        {campaign ? 
+                          `${Math.min(contact.current_step, campaign.max_steps)}/${campaign.max_steps}` : 
+                          `${contact.current_step}/N/A`
+                        }
+                      </td>
                       <td>
                         {contact.replied ? 
                           <span className="badge badge-success">✅ Replied</span> : 
-                          <span className="badge badge-warning">⏳ Pending</span>
+                          campaign && contact.current_step >= campaign.max_steps ?
+                            <span className="badge badge-info">🏁 Complete</span> :
+                            <span className="badge badge-warning">⏳ Pending</span>
                         }
                       </td>
                       <td>{contact.last_message_at ? formatDate(contact.last_message_at) : 'Never'}</td>

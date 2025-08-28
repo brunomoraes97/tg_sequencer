@@ -78,44 +78,37 @@ const ContactsPage: React.FC = () => {
 
   const formatNextMessage = (contact: Contact) => {
     // If contact has replied, no next message
-    if (contact.replied) return 'Contact replied - no more messages';
+    if (contact.replied) return 'Respondeu - concluído';
     
     // Find the campaign for this contact
     const campaign = campaigns.find(c => c.account_id === contact.account_id && c.active);
-    if (!campaign) return 'No active campaign found';
+    if (!campaign) return 'Sem campanha ativa';
     
     // Check if contact exceeded max steps
     if (contact.current_step >= campaign.max_steps) {
-      return 'Campaign completed - no more messages';
+      return 'Campanha concluída';
     }
     
     // If no last message, next message is now
-    if (!contact.last_message_at) return '🔴 Ready to send first message';
+    if (!contact.last_message_at) return 'Agora';
     
     try {
       const lastMessage = new Date(contact.last_message_at);
       const nextMessage = new Date(lastMessage.getTime() + (campaign.interval_seconds * 1000));
-      const now = new Date();
       
-      const diff = nextMessage.getTime() - now.getTime();
-      const dateStr = nextMessage.toLocaleDateString('en-US', { 
-        month: 'short', 
-        day: 'numeric',
-        year: nextMessage.getFullYear() !== now.getFullYear() ? 'numeric' : undefined
+      const dateStr = nextMessage.toLocaleDateString('pt-BR', { 
+        day: '2-digit',
+        month: '2-digit',
+        year: nextMessage.getFullYear() !== new Date().getFullYear() ? 'numeric' : undefined
       });
-      const timeStr = nextMessage.toLocaleTimeString('en-US', { 
+      const timeStr = nextMessage.toLocaleTimeString('pt-BR', { 
         hour: '2-digit', 
         minute: '2-digit' 
       });
       
-      if (diff < 0) return `🔴 Overdue - was due ${dateStr} at ${timeStr}`;
-      if (diff < 60 * 1000) return `🟡 Due now - ${dateStr} at ${timeStr}`;
-      if (diff < 60 * 60 * 1000) return `🟡 Due in ${Math.round(diff / (60 * 1000))} min - ${dateStr} at ${timeStr}`;
-      if (diff < 24 * 60 * 60 * 1000) return `🟢 Due in ${Math.round(diff / (60 * 60 * 1000))} hrs - ${dateStr} at ${timeStr}`;
-      
-      return `🟢 Next: ${dateStr} at ${timeStr}`;
+      return `${dateStr} às ${timeStr}`;
     } catch {
-      return '❌ Invalid date';
+      return 'Data inválida';
     }
   };
 
@@ -125,7 +118,7 @@ const ContactsPage: React.FC = () => {
     const campaign = campaigns.find(c => c.account_id === contact.account_id && c.active);
     const maxSteps = campaign ? campaign.max_steps : 3; // fallback to 3
     
-    if (contact.current_step >= maxSteps) return '⏹️ Completed';
+    if (contact.current_step >= maxSteps) return '🏁 Complete';
     return '📤 In Progress';
   };
 
@@ -282,7 +275,11 @@ const ContactsPage: React.FC = () => {
                 <p><strong>Phone:</strong> {contact.user_info.phone}</p>
               )}
               {contact.tag && <p><strong>Tag:</strong> <span className="tag">{contact.tag}</span></p>}
-              <p><strong>Current Step:</strong> {contact.current_step}</p>
+              <p><strong>Current Step:</strong> {(() => {
+                const campaign = campaigns.find(c => c.account_id === contact.account_id && c.active);
+                const maxSteps = campaign ? campaign.max_steps : 3;
+                return `${Math.min(contact.current_step, maxSteps)}/${maxSteps}`;
+              })()}</p>
               {contact.last_message_at && (
                 <p><strong>Last Message:</strong> {new Date(contact.last_message_at).toLocaleString()}</p>
               )}
