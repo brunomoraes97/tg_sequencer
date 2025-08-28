@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { accountsAPI, Account } from '../api';
+import AccountForm from './AccountForm';
 
 const AccountsPage: React.FC = () => {
   const [accounts, setAccounts] = useState<Account[]>([]);
@@ -7,6 +8,7 @@ const AccountsPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [editingAccount, setEditingAccount] = useState<Account | null>(null);
   const [editForm, setEditForm] = useState({ name: '', tag: '' });
+  const [showCreateForm, setShowCreateForm] = useState(false);
 
   const loadAccounts = async () => {
     setLoading(true);
@@ -70,9 +72,30 @@ const AccountsPage: React.FC = () => {
       <div className="page-header">
         <h1>📞 Accounts</h1>
         <p>Manage your Telegram accounts</p>
+        <button 
+          className="btn-primary"
+          onClick={() => setShowCreateForm(true)}
+        >
+          ➕ New Account
+        </button>
       </div>
 
       {error && <div className="error">{error}</div>}
+
+      {showCreateForm && (
+        <div className="modal-overlay" onClick={() => setShowCreateForm(false)}>
+          <div className="modal-content" onClick={e => e.stopPropagation()}>
+            <h2>Create New Account</h2>
+            <AccountForm 
+              onSuccess={() => {
+                setShowCreateForm(false);
+                loadAccounts();
+              }} 
+              onCancel={() => setShowCreateForm(false)} 
+            />
+          </div>
+        </div>
+      )}
 
       <div className="accounts-grid">
         {accounts.map(account => (

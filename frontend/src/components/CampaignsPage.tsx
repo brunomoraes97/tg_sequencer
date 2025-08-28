@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { campaignsAPI, Campaign, Account, accountsAPI } from '../api';
+import CampaignForm from './CampaignForm';
 
 const CampaignsPage: React.FC = () => {
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
@@ -7,6 +8,7 @@ const CampaignsPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [editingCampaign, setEditingCampaign] = useState<Campaign | null>(null);
+  const [showCreateForm, setShowCreateForm] = useState(false);
   const [editForm, setEditForm] = useState({
     name: '',
     account_id: '',
@@ -101,9 +103,31 @@ const CampaignsPage: React.FC = () => {
       <div className="page-header">
         <h1>🎯 Campaigns</h1>
         <p>Manage your follow-up campaigns</p>
+        <button 
+          className="btn-primary"
+          onClick={() => setShowCreateForm(true)}
+        >
+          ➕ New Campaign
+        </button>
       </div>
 
       {error && <div className="error">{error}</div>}
+
+      {showCreateForm && (
+        <div className="modal-overlay" onClick={() => setShowCreateForm(false)}>
+          <div className="modal-content" onClick={e => e.stopPropagation()}>
+            <h2>Create New Campaign</h2>
+            <CampaignForm 
+              accounts={accounts}
+              onSuccess={() => {
+                setShowCreateForm(false);
+                loadCampaigns();
+              }} 
+              onCancel={() => setShowCreateForm(false)} 
+            />
+          </div>
+        </div>
+      )}
 
       <div className="campaigns-grid">
         {campaigns.map(campaign => (

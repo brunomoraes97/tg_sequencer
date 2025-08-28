@@ -11,7 +11,7 @@ import CampaignsPage from './components/CampaignsPage';
 import ContactsPage from './components/ContactsPage';
 import HelpPage from './components/HelpPage';
 
-type View = 'dashboard' | 'accounts' | 'campaigns' | 'contacts' | 'help' | 'create-account' | 'create-campaign' | 'create-contact';
+type View = 'dashboard' | 'accounts' | 'campaigns' | 'contacts' | 'help';
 
 function App() {
   const [view, setView] = useState<View>('dashboard');
@@ -76,25 +76,6 @@ function App() {
           >
             ❓ Help
           </button>
-          <div className="nav-divider"></div>
-          <button 
-            onClick={() => setView('create-account')}
-            className={view === 'create-account' ? 'active' : ''}
-          >
-            ➕ New Account
-          </button>
-          <button 
-            onClick={() => setView('create-campaign')}
-            className={view === 'create-campaign' ? 'active' : ''}
-          >
-            🎯 New Campaign
-          </button>
-          <button 
-            onClick={() => setView('create-contact')}
-            className={view === 'create-contact' ? 'active' : ''}
-          >
-            👤 New Contact
-          </button>
         </nav>
       </header>
 
@@ -110,26 +91,6 @@ function App() {
 
         {view === 'dashboard' && dashboardData && (
           <Dashboard data={dashboardData} onRefresh={loadDashboard} />
-        )}
-
-        {view === 'create-account' && (
-          <AccountForm onSuccess={handleSuccess} onCancel={() => setView('dashboard')} />
-        )}
-
-        {view === 'create-campaign' && dashboardData && (
-          <CampaignForm 
-            accounts={dashboardData.accounts} 
-            onSuccess={handleSuccess} 
-            onCancel={() => setView('dashboard')} 
-          />
-        )}
-
-        {view === 'create-contact' && dashboardData && (
-          <ContactForm 
-            accounts={dashboardData.accounts} 
-            onSuccess={handleSuccess} 
-            onCancel={() => setView('dashboard')} 
-          />
         )}
 
         {view === 'accounts' && <AccountsPage />}

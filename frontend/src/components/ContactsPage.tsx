@@ -1,24 +1,29 @@
 import React, { useState, useEffect } from 'react';
-import { contactsAPI, Contact, Account, accountsAPI } from '../api';
+import { contactsAPI, Contact, Account, accountsAPI, Campaign, campaignsAPI } from '../api';
+import ContactForm from './ContactForm';
 
 const ContactsPage: React.FC = () => {
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
+  const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [editingContact, setEditingContact] = useState<Contact | null>(null);
+  const [showCreateForm, setShowCreateForm] = useState(false);
   const [editForm, setEditForm] = useState({ name: '', tag: '' });
 
   const loadContacts = async () => {
     setLoading(true);
     setError(null);
     try {
-      const [contactsData, accountsData] = await Promise.all([
+      const [contactsData, accountsData, campaignsData] = await Promise.all([
         contactsAPI.getContacts(),
-        accountsAPI.getAccounts()
+        accountsAPI.getAccounts(),
+        campaignsAPI.getCampaigns()
       ]);
       setContacts(contactsData);
       setAccounts(accountsData);
+      setCampaigns(campaignsData);
     } catch (err: any) {
       setError(err.response?.data?.detail || 'Error loading contacts');
     } finally {
@@ -64,29 +69,56 @@ const ContactsPage: React.FC = () => {
     return account ? (account.name || account.phone) : 'Unknown Account';
   };
 
-  const formatNextMessage = (nextMessageTime?: string) => {
-    if (!nextMessageTime) return 'Not scheduled';
-    if (nextMessageTime === 'now') return '🔴 Due now';
+  const formatNextMessage = (contact: Contact) => {
+    // If contact has replied, no next message
+    if (contact.replied) return 'Contact replied - no more messages';
+    
+    // Find the campaign for this contact
+    const campaign = campaigns.find(c => c.account_id === contact.account_id && c.active);
+    if (!campaign) return 'No active campaign found';
+    
+    // Check if contact exceeded max steps
+    if (contact.current_step >= campaign.max_steps) {
+      return 'Campaign completed - no more messages';
+    }
+    
+    // If no last message, next message is now
+    if (!contact.last_message_at) return '🔴 Ready to send first message';
     
     try {
-      const date = new Date(nextMessageTime);
+      const lastMessage = new Date(contact.last_message_at);
+      const nextMessage = new Date(lastMessage.getTime() + (campaign.interval_seconds * 1000));
       const now = new Date();
-      const diff = date.getTime() - now.getTime();
       
-      if (diff < 0) return '🔴 Overdue';
-      if (diff < 60 * 1000) return '🟡 Due in < 1 minute';
-      if (diff < 60 * 60 * 1000) return `🟡 Due in ${Math.round(diff / (60 * 1000))} minutes`;
-      if (diff < 24 * 60 * 60 * 1000) return `🟢 Due in ${Math.round(diff / (60 * 60 * 1000))} hours`;
+      const diff = nextMessage.getTime() - now.getTime();
+      const dateStr = nextMessage.toLocaleDateString('en-US', { 
+        month: 'short', 
+        day: 'numeric',
+        year: nextMessage.getFullYear() !== now.getFullYear() ? 'numeric' : undefined
+      });
+      const timeStr = nextMessage.toLocaleTimeString('en-US', { 
+        hour: '2-digit', 
+        minute: '2-digit' 
+      });
       
-      return `🟢 Due on ${date.toLocaleDateString()} at ${date.toLocaleTimeString()}`;
+      if (diff < 0) return `🔴 Overdue - was due ${dateStr} at ${timeStr}`;
+      if (diff < 60 * 1000) return `🟡 Due now - ${dateStr} at ${timeStr}`;
+      if (diff < 60 * 60 * 1000) return `🟡 Due in ${Math.round(diff / (60 * 1000))} min - ${dateStr} at ${timeStr}`;
+      if (diff < 24 * 60 * 60 * 1000) return `🟢 Due in ${Math.round(diff / (60 * 60 * 1000))} hrs - ${dateStr} at ${timeStr}`;
+      
+      return `🟢 Next: ${dateStr} at ${timeStr}`;
     } catch {
-      return 'Invalid date';
+      return '❌ Invalid date';
     }
   };
 
   const getStatusBadge = (contact: Contact) => {
     if (contact.replied) return '✅ Replied';
-    if (contact.current_step > (contact.user_info ? 3 : 3)) return '⏹️ Completed'; // Fallback max steps
+    
+    const campaign = campaigns.find(c => c.account_id === contact.account_id && c.active);
+    const maxSteps = campaign ? campaign.max_steps : 3; // fallback to 3
+    
+    if (contact.current_step >= maxSteps) return '⏹️ Completed';
     return '📤 In Progress';
   };
 
@@ -97,9 +129,31 @@ const ContactsPage: React.FC = () => {
       <div className="page-header">
         <h1>👥 Contacts</h1>
         <p>Manage your follow-up contacts</p>
+        <button 
+          className="btn-primary"
+          onClick={() => setShowCreateForm(true)}
+        >
+          ➕ New Contact
+        </button>
       </div>
 
       {error && <div className="error">{error}</div>}
+
+      {showCreateForm && (
+        <div className="modal-overlay" onClick={() => setShowCreateForm(false)}>
+          <div className="modal-content" onClick={e => e.stopPropagation()}>
+            <h2>Create New Contact</h2>
+            <ContactForm 
+              accounts={accounts}
+              onSuccess={() => {
+                setShowCreateForm(false);
+                loadContacts();
+              }} 
+              onCancel={() => setShowCreateForm(false)} 
+            />
+          </div>
+        </div>
+      )}
 
       <div className="contacts-grid">
         {contacts.map(contact => (
@@ -126,7 +180,7 @@ const ContactsPage: React.FC = () => {
               {contact.last_message_at && (
                 <p><strong>Last Message:</strong> {new Date(contact.last_message_at).toLocaleString()}</p>
               )}
-              <p><strong>Next Message:</strong> {formatNextMessage(contact.next_message_time)}</p>
+              <p><strong>Next Message:</strong> {formatNextMessage(contact)}</p>
             </div>
 
             {contact.user_info && (
