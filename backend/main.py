@@ -204,15 +204,22 @@ def get_campaigns(db: Session = Depends(get_db)):
     return [CampaignResponse.from_orm(camp) for camp in campaigns]
 
 @app.put("/api/campaigns/{campaign_id}", response_model=CampaignResponse)
-def update_campaign(campaign_id: str, campaign_data: CampaignCreate, db: Session = Depends(get_db)):
+def update_campaign(campaign_id: str, campaign_data: CampaignUpdate, db: Session = Depends(get_db)):
     """Update campaign"""
     camp = db.get(Campaign, campaign_id)
     if not camp:
         raise HTTPException(404, "Campaign not found")
     
-    camp.name = campaign_data.name
-    camp.interval_seconds = campaign_data.interval_seconds
-    # Remove max_steps update since it's determined by steps count
+    # Update only provided fields
+    if campaign_data.name is not None:
+        camp.name = campaign_data.name
+    if campaign_data.interval_seconds is not None:
+        camp.interval_seconds = campaign_data.interval_seconds
+    if campaign_data.active is not None:
+        camp.active = campaign_data.active
+    if campaign_data.account_id is not None:
+        camp.account_id = campaign_data.account_id
+    
     db.commit()
     return CampaignResponse.from_orm(camp)
 
@@ -253,6 +260,62 @@ def add_campaign_step(campaign_id: str, step_data: CampaignStepCreate, db: Sessi
     db.commit()
     return CampaignStepResponse.from_orm(step)
 
+@app.put("/api/campaigns/{campaign_id}/steps/{step_id}", response_model=CampaignStepResponse)
+def update_campaign_step(campaign_id: str, step_id: str, step_data: CampaignStepCreate, db: Session = Depends(get_db)):
+    """Update campaign step"""
+    step = db.get(CampaignStep, step_id)
+    if not step or step.campaign_id != campaign_id:
+        raise HTTPException(404, "Step not found")
+    
+    step.step_number = step_data.step_number
+    step.message = step_data.message
+    db.commit()
+    return CampaignStepResponse.from_orm(step)
+
+@app.delete("/api/campaigns/{campaign_id}/steps/{step_id}")
+def delete_campaign_step(campaign_id: str, step_id: str, db: Session = Depends(get_db)):
+    """Delete campaign step"""
+    step = db.get(CampaignStep, step_id)
+    if not step or step.campaign_id != campaign_id:
+        raise HTTPException(404, "Step not found")
+    
+    db.delete(step)
+    db.commit()
+    return {"message": "Step deleted successfully"}
+
+@app.post("/api/campaigns/{campaign_id}/contacts/{contact_id}")
+def assign_contact_to_campaign(campaign_id: str, contact_id: str, db: Session = Depends(get_db)):
+    """Assign contact to campaign"""
+    campaign = db.get(Campaign, campaign_id)
+    contact = db.get(Contact, contact_id)
+    
+    if not campaign:
+        raise HTTPException(404, "Campaign not found")
+    if not contact:
+        raise HTTPException(404, "Contact not found")
+    if contact.account_id != campaign.account_id:
+        raise HTTPException(400, "Contact and campaign must belong to the same account")
+    
+    contact.campaign_id = campaign_id
+    contact.current_step = 1
+    contact.replied = False
+    contact.last_message_at = None
+    db.commit()
+    
+    return {"message": "Contact assigned to campaign successfully"}
+
+@app.delete("/api/campaigns/{campaign_id}/contacts/{contact_id}")
+def remove_contact_from_campaign(campaign_id: str, contact_id: str, db: Session = Depends(get_db)):
+    """Remove contact from campaign"""
+    contact = db.get(Contact, contact_id)
+    if not contact or contact.campaign_id != campaign_id:
+        raise HTTPException(404, "Contact not found in this campaign")
+    
+    contact.campaign_id = None
+    db.commit()
+    
+    return {"message": "Contact removed from campaign successfully"}
+
 # Contact endpoints
 @app.post("/api/contacts", response_model=ContactResponse)
 async def create_contact(contact_data: ContactCreate, db: Session = Depends(get_db)):
@@ -270,6 +333,7 @@ async def create_contact(contact_data: ContactCreate, db: Session = Depends(get_
         contact = Contact(
             id=str(uuid.uuid4()),
             account_id=contact_data.account_id,
+            campaign_id=contact_data.campaign_id,
             telegram_user_id=telegram_user_id,
             name=contact_data.name,
             tag=contact_data.tag
@@ -292,7 +356,7 @@ def get_contacts(db: Session = Depends(get_db)):
 
 @app.put("/api/contacts/{contact_id}", response_model=ContactResponse)
 def update_contact(contact_id: str, contact_data: ContactUpdate, db: Session = Depends(get_db)):
-    """Update contact name and tag"""
+    """Update contact name, tag and campaign assignment"""
     contact = db.get(Contact, contact_id)
     if not contact:
         raise HTTPException(404, "Contact not found")
@@ -301,6 +365,19 @@ def update_contact(contact_id: str, contact_data: ContactUpdate, db: Session = D
         contact.name = contact_data.name
     if contact_data.tag is not None:
         contact.tag = contact_data.tag
+    if contact_data.campaign_id is not None:
+        # Verify campaign belongs to same account
+        if contact_data.campaign_id:
+            campaign = db.get(Campaign, contact_data.campaign_id)
+            if not campaign or campaign.account_id != contact.account_id:
+                raise HTTPException(400, "Campaign not found or doesn't belong to the same account")
+        contact.campaign_id = contact_data.campaign_id
+        # Reset progress when assigned to new campaign
+        if contact_data.campaign_id:
+            contact.current_step = 1
+            contact.replied = False
+            contact.last_message_at = None
+    
     db.commit()
     return ContactResponse.from_orm(contact)
 

@@ -17,7 +17,7 @@ const ContactsPage: React.FC = () => {
   const [statusFilter, setStatusFilter] = useState('all');
   const [campaignFilter, setCampaignFilter] = useState('all');
   // const { showSuccess, showError } = useToast(); // Uncomment when needed
-  const [editForm, setEditForm] = useState({ name: '', tag: '' });
+  const [editForm, setEditForm] = useState({ name: '', tag: '', campaign_id: '' });
 
   const loadContacts = async () => {
     setLoading(true);
@@ -44,7 +44,11 @@ const ContactsPage: React.FC = () => {
 
   const handleEdit = (contact: Contact) => {
     setEditingContact(contact);
-    setEditForm({ name: contact.name || '', tag: contact.tag || '' });
+    setEditForm({ 
+      name: contact.name || '', 
+      tag: contact.tag || '',
+      campaign_id: contact.campaign_id || ''
+    });
   };
 
   const handleSaveEdit = async () => {
@@ -80,9 +84,13 @@ const ContactsPage: React.FC = () => {
     // If contact has replied, no next message
     if (contact.replied) return 'Respondeu - concluído';
     
-    // Find the campaign for this contact
-    const campaign = campaigns.find(c => c.account_id === contact.account_id && c.active);
-    if (!campaign) return 'Sem campanha ativa';
+    // Find the specific campaign for this contact
+    const campaign = contact.campaign_id 
+      ? campaigns.find(c => c.id === contact.campaign_id)
+      : null;
+    
+    if (!campaign) return 'Sem campanha atribuída';
+    if (!campaign.active) return 'Campanha inativa';
     
     // Check if contact exceeded max steps
     if (contact.current_step >= campaign.max_steps) {
@@ -115,8 +123,14 @@ const ContactsPage: React.FC = () => {
   const getStatusBadge = (contact: Contact) => {
     if (contact.replied) return '✅ Replied';
     
-    const campaign = campaigns.find(c => c.account_id === contact.account_id && c.active);
-    const maxSteps = campaign ? campaign.max_steps : 3; // fallback to 3
+    const campaign = contact.campaign_id 
+      ? campaigns.find(c => c.id === contact.campaign_id)
+      : null;
+    
+    if (!campaign) return '❌ No Campaign';
+    if (!campaign.active) return '⏸️ Inactive Campaign';
+    
+    const maxSteps = campaign.max_steps;
     
     if (contact.current_step >= maxSteps) return '🏁 Complete';
     return '📤 In Progress';
@@ -275,11 +289,35 @@ const ContactsPage: React.FC = () => {
                 <p><strong>Phone:</strong> {contact.user_info.phone}</p>
               )}
               {contact.tag && <p><strong>Tag:</strong> <span className="tag">{contact.tag}</span></p>}
-              <p><strong>Current Step:</strong> {(() => {
-                const campaign = campaigns.find(c => c.account_id === contact.account_id && c.active);
-                const maxSteps = campaign ? campaign.max_steps : 3;
-                return `${Math.min(contact.current_step, maxSteps)}/${maxSteps}`;
-              })()}</p>
+              
+              {(() => {
+                const campaign = contact.campaign_id 
+                  ? campaigns.find(c => c.id === contact.campaign_id)
+                  : null;
+                if (campaign) {
+                  return (
+                    <div className="campaign-info">
+                      <p><strong>📋 Campaign:</strong> <span className="campaign-name">{campaign.name}</span></p>
+                      <p><strong>Progress:</strong> {Math.min(contact.current_step, campaign.max_steps)}/{campaign.max_steps} steps</p>
+                      <p><strong>Interval:</strong> {(() => {
+                        if (campaign.interval_seconds >= 86400) return `${Math.round(campaign.interval_seconds / 86400)} days`;
+                        if (campaign.interval_seconds >= 3600) return `${Math.round(campaign.interval_seconds / 3600)} hours`;
+                        if (campaign.interval_seconds >= 60) return `${Math.round(campaign.interval_seconds / 60)} minutes`;
+                        return `${campaign.interval_seconds} seconds`;
+                      })()}</p>
+                      {!campaign.active && <p className="warning-text">⚠️ Campaign is inactive</p>}
+                    </div>
+                  );
+                } else {
+                  return (
+                    <div className="no-campaign-warning">
+                      <p><strong>⚠️ No Campaign Assigned</strong></p>
+                      <p className="warning-text">This contact won't receive automated messages</p>
+                    </div>
+                  );
+                }
+              })()}
+              
               {contact.last_message_at && (
                 <p><strong>Last Message:</strong> {new Date(contact.last_message_at).toLocaleString()}</p>
               )}
@@ -338,6 +376,23 @@ const ContactsPage: React.FC = () => {
                 onChange={(e) => setEditForm({ ...editForm, tag: e.target.value })}
                 placeholder="Tag/label for organization"
               />
+            </div>
+            <div className="form-group">
+              <label>Campaign</label>
+              <select
+                value={editForm.campaign_id}
+                onChange={(e) => setEditForm({ ...editForm, campaign_id: e.target.value })}
+              >
+                <option value="">No Campaign</option>
+                {campaigns
+                  .filter(campaign => campaign.account_id === editingContact.account_id)
+                  .map(campaign => (
+                    <option key={campaign.id} value={campaign.id}>
+                      {campaign.name} {!campaign.active ? '(Inactive)' : ''}
+                    </option>
+                  ))
+                }
+              </select>
             </div>
             <div className="form-actions">
               <button onClick={handleSaveEdit} className="btn btn-primary">

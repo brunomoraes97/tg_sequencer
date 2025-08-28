@@ -46,6 +46,12 @@ class CampaignCreate(BaseModel):
     interval_seconds: int = 86400
     max_steps: int = 3
 
+class CampaignUpdate(BaseModel):
+    account_id: Optional[str] = None
+    name: Optional[str] = None
+    interval_seconds: Optional[int] = None
+    active: Optional[bool] = None
+
 class CampaignResponse(BaseModel):
     id: str
     account_id: str
@@ -64,10 +70,12 @@ class ContactCreate(BaseModel):
     identifier: str  # username or phone
     name: Optional[str] = None
     tag: Optional[str] = None
+    campaign_id: Optional[str] = None
 
 class ContactUpdate(BaseModel):
     name: Optional[str] = None
     tag: Optional[str] = None
+    campaign_id: Optional[str] = None
 
 class UserInfo(BaseModel):
     id: int
@@ -82,6 +90,7 @@ class UserInfo(BaseModel):
 class ContactResponse(BaseModel):
     id: str
     account_id: str
+    campaign_id: Optional[str] = None
     telegram_user_id: int
     name: Optional[str] = None
     tag: Optional[str] = None

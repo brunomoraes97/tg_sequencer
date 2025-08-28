@@ -28,6 +28,7 @@ class Campaign(Base):
 
     account = relationship("Account", back_populates="campaigns")
     steps = relationship("CampaignStep", back_populates="campaign", order_by="CampaignStep.step_number")
+    contacts = relationship("Contact", back_populates="campaign")
 
 class CampaignStep(Base):
     __tablename__ = "campaign_steps"
@@ -42,12 +43,15 @@ class Contact(Base):
     __tablename__ = "contacts"
     id = Column(String, primary_key=True)
     account_id = Column(String, ForeignKey("accounts.id"), nullable=False)
+    campaign_id = Column(String, ForeignKey("campaigns.id"), nullable=True)  # specific campaign assignment
     telegram_user_id = Column(BigInteger, nullable=False)
     name = Column(String, nullable=True)                # user-friendly name
     tag = Column(String, nullable=True)                 # user tag/label
     replied = Column(Boolean, default=False)
     current_step = Column(Integer, default=1)
     last_message_at = Column(DateTime, nullable=True)
+
+    campaign = relationship("Campaign", back_populates="contacts")
 
 class MessageLog(Base):
     __tablename__ = "messages_sent"

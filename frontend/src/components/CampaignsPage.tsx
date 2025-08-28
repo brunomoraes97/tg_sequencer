@@ -1,34 +1,36 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { campaignsAPI, Campaign, Account, accountsAPI } from '../api';
-import CampaignForm from './CampaignForm';
+import React, { useState, useEffect } from 'react';
+import { campaignsAPI, accountsAPI, contactsAPI, Campaign, Account, Contact, CampaignStep } from '../api';
 import { useToast } from '../contexts/ToastContext';
 import Alert from './Alert';
 
-const CampaignsPage: React.FC = () => {
+interface CampaignsPageProps {
+  onCreateCampaign: () => void;
+  onEditCampaign: (campaignId: string) => void;
+}
+
+const CampaignsPage: React.FC<CampaignsPageProps> = ({ onCreateCampaign, onEditCampaign }) => {
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [contacts, setContacts] = useState<Contact[]>([]);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [editingCampaign, setEditingCampaign] = useState<Campaign | null>(null);
-  const [showCreateForm, setShowCreateForm] = useState(false);
+  const [editForm, setEditForm] = useState({ name: '', account_id: '', interval_seconds: 3600 });
   const [showAlert, setShowAlert] = useState(true);
-  const { showSuccess, showError } = useToast();
-  const [editForm, setEditForm] = useState({
-    name: '',
-    account_id: '',
-    interval_seconds: 86400
-  });
 
-  const loadCampaigns = useCallback(async () => {
-    setLoading(true);
-    setError(null);
+  const { showSuccess, showError } = useToast();
+
+  useEffect(() => {
+    loadCampaigns();
+    loadAccounts();
+    loadContacts();
+  }, []);
+
+  const loadCampaigns = async () => {
     try {
-      const [campaignsData, accountsData] = await Promise.all([
-        campaignsAPI.getCampaigns(),
-        accountsAPI.getAccounts()
-      ]);
-      setCampaigns(campaignsData);
-      setAccounts(accountsData);
+      const data = await campaignsAPI.getCampaigns();
+      setCampaigns(data);
+      setError(null);
     } catch (err: any) {
       const errorMessage = err.response?.data?.detail || 'Error loading campaigns';
       setError(errorMessage);
@@ -36,11 +38,102 @@ const CampaignsPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [showError]);
+  };
 
-  useEffect(() => {
-    loadCampaigns();
-  }, [loadCampaigns]);
+  const loadAccounts = async () => {
+    try {
+      const data = await accountsAPI.getAccounts();
+      setAccounts(data);
+    } catch (err: any) {
+      console.error('Error loading accounts:', err);
+    }
+  };
+
+  const loadContacts = async () => {
+    try {
+      const data = await contactsAPI.getContacts();
+      setContacts(data);
+    } catch (err: any) {
+      console.error('Error loading contacts:', err);
+    }
+  };
+
+  const getContactsCount = (campaign: Campaign) => {
+    return contacts.filter(contact => contact.campaign_id === campaign.id).length;
+  };
+
+  const getRepliedContactsCount = (campaign: Campaign) => {
+    return contacts.filter(contact => contact.campaign_id === campaign.id && contact.replied).length;
+  };
+
+  const deleteCampaign = async (campaign: Campaign) => {
+    const activeContactsCount = contacts.filter(contact => 
+      contact.campaign_id === campaign.id && !contact.replied
+    ).length;
+
+    if (activeContactsCount > 0) {
+      showError('Error', `Cannot delete campaign. There are ${activeContactsCount} active contacts in this campaign.`);
+      return;
+    }
+
+    try {
+      await campaignsAPI.deleteCampaign(campaign.id);
+      setCampaigns(campaigns.filter(c => c.id !== campaign.id));
+      showSuccess('Success', 'Campaign deleted successfully!');
+    } catch (err: any) {
+      const errorMessage = err.response?.data?.detail || 'Error deleting campaign';
+      setError(errorMessage);
+      showError('Error', errorMessage);
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    // eslint-disable-next-line no-restricted-globals
+    if (!confirm('Are you sure you want to delete this campaign?')) return;
+
+    try {
+      await campaignsAPI.deleteCampaign(id);
+      setCampaigns(campaigns.filter(campaign => campaign.id !== id));
+      showSuccess('Success', 'Campaign deleted successfully!');
+    } catch (err: any) {
+      const errorMessage = err.response?.data?.detail || 'Error deleting campaign';
+      setError(errorMessage);
+      showError('Error', errorMessage);
+    }
+  };
+
+  const toggleCampaignStatus = async (campaign: Campaign) => {
+    try {
+      const updated = await campaignsAPI.updateCampaign(campaign.id, {
+        active: !campaign.active
+      });
+      setCampaigns(campaigns.map(camp => camp.id === updated.id ? updated : camp));
+      showSuccess('Success', `Campaign ${updated.active ? 'activated' : 'deactivated'} successfully!`);
+    } catch (err: any) {
+      const errorMessage = err.response?.data?.detail || 'Error updating campaign status';
+      setError(errorMessage);
+      showError('Error', errorMessage);
+    }
+  };
+
+  const getAccountName = (accountId: string) => {
+    const account = accounts.find(acc => acc.id === accountId);
+    return account ? (account.name || account.phone) : 'Unknown Account';
+  };
+
+  const formatInterval = (seconds: number) => {
+    if (seconds < 60) return `${seconds}s`;
+    if (seconds < 3600) return `${Math.floor(seconds / 60)}m`;
+    if (seconds < 86400) return `${Math.floor(seconds / 3600)}h`;
+    return `${Math.floor(seconds / 86400)}d`;
+  };
+
+  const formatIntervalInput = (seconds: number) => {
+    if (seconds % 86400 === 0) return { value: seconds / 86400, unit: 'days' };
+    if (seconds % 3600 === 0) return { value: seconds / 3600, unit: 'hours' };
+    if (seconds % 60 === 0) return { value: seconds / 60, unit: 'minutes' };
+    return { value: seconds, unit: 'seconds' };
+  };
 
   const handleEdit = (campaign: Campaign) => {
     setEditingCampaign(campaign);
@@ -51,12 +144,21 @@ const CampaignsPage: React.FC = () => {
     });
   };
 
+  const handleIntervalChange = (value: number, unit: string) => {
+    let seconds = value;
+    if (unit === 'minutes') seconds *= 60;
+    else if (unit === 'hours') seconds *= 3600;
+    else if (unit === 'days') seconds *= 86400;
+    
+    setEditForm({ ...editForm, interval_seconds: seconds });
+  };
+
   const handleSaveEdit = async () => {
     if (!editingCampaign) return;
     
     try {
       const updated = await campaignsAPI.updateCampaign(editingCampaign.id, editForm);
-      setCampaigns(campaigns.map(camp => camp.id === updated.id ? updated : camp));
+      setCampaigns(campaigns.map(campaign => campaign.id === updated.id ? updated : campaign));
       setEditingCampaign(null);
       showSuccess('Success', 'Campaign updated successfully!');
     } catch (err: any) {
@@ -64,48 +166,6 @@ const CampaignsPage: React.FC = () => {
       setError(errorMessage);
       showError('Error', errorMessage);
     }
-  };
-
-    const handleDelete = async (id: string) => {
-    // eslint-disable-next-line no-restricted-globals
-    if (!confirm('Are you sure you want to delete this campaign?')) return;
-
-    try {
-      await campaignsAPI.deleteCampaign(id);
-      setCampaigns(campaigns.filter(camp => camp.id !== id));
-      showSuccess('Success', 'Campaign deleted successfully!');
-    } catch (err: any) {
-      const errorMessage = err.response?.data?.detail || 'Error deleting campaign';
-      setError(errorMessage);
-      showError('Error', errorMessage);
-    }
-  };
-
-  const formatInterval = (seconds: number) => {
-    if (seconds < 60) return `${seconds} seconds`;
-    if (seconds < 3600) return `${Math.round(seconds / 60)} minutes`;
-    if (seconds < 86400) return `${Math.round(seconds / 3600)} hours`;
-    return `${Math.round(seconds / 86400)} days`;
-  };
-
-  const formatIntervalInput = (seconds: number) => {
-    if (seconds >= 86400) return { value: seconds / 86400, unit: 'days' };
-    if (seconds >= 3600) return { value: seconds / 3600, unit: 'hours' };
-    if (seconds >= 60) return { value: seconds / 60, unit: 'minutes' };
-    return { value: seconds, unit: 'seconds' };
-  };
-
-  const handleIntervalChange = (value: number, unit: string) => {
-    const multipliers = { seconds: 1, minutes: 60, hours: 3600, days: 86400 };
-    setEditForm({
-      ...editForm,
-      interval_seconds: value * multipliers[unit as keyof typeof multipliers]
-    });
-  };
-
-  const getAccountName = (accountId: string) => {
-    const account = accounts.find(acc => acc.id === accountId);
-    return account ? (account.name || account.phone) : 'Unknown Account';
   };
 
   if (loading) return <div className="loading">Loading campaigns...</div>;
@@ -117,7 +177,7 @@ const CampaignsPage: React.FC = () => {
         <p>Manage your follow-up campaigns</p>
         <button 
           className="btn-primary"
-          onClick={() => setShowCreateForm(true)}
+          onClick={onCreateCampaign}
         >
           ➕ New Campaign
         </button>
@@ -134,43 +194,49 @@ const CampaignsPage: React.FC = () => {
 
       {error && <div className="error">{error}</div>}
 
-      {showCreateForm && (
-        <div className="modal-overlay" onClick={() => setShowCreateForm(false)}>
-          <div className="modal-content" onClick={e => e.stopPropagation()}>
-            <h2>Create New Campaign</h2>
-            <CampaignForm 
-              accounts={accounts}
-              onSuccess={() => {
-                setShowCreateForm(false);
-                loadCampaigns();
-              }} 
-              onCancel={() => setShowCreateForm(false)} 
-            />
-          </div>
-        </div>
-      )}
-
       <div className="campaigns-grid">
         {campaigns.map(campaign => (
           <div key={campaign.id} className="campaign-card">
             <div className="campaign-header">
               <h3>{campaign.name}</h3>
-              <span className={`status-badge ${campaign.active ? 'active' : 'inactive'}`}>
-                {campaign.active ? '✅ Active' : '⏸️ Inactive'}
-              </span>
+              <div className="campaign-status">
+                <span className={`status-badge ${campaign.active ? 'active' : 'inactive'}`}>
+                  {campaign.active ? '🟢 Active' : '🔴 Inactive'}
+                </span>
+                <button 
+                  onClick={() => toggleCampaignStatus(campaign)}
+                  className={`btn btn-sm ${campaign.active ? 'btn-warning' : 'btn-success'}`}
+                >
+                  {campaign.active ? 'Deactivate' : 'Activate'}
+                </button>
+              </div>
             </div>
             
-            <div className="campaign-details">
+            <div className="campaign-info">
               <p><strong>Account:</strong> {getAccountName(campaign.account_id)}</p>
               <p><strong>Interval:</strong> {formatInterval(campaign.interval_seconds)}</p>
-              <p><strong>Steps:</strong> {campaign.steps?.length || 0}</p>
-              <p><strong>Max Steps:</strong> {campaign.max_steps}</p>
+              <p><strong>Steps:</strong> {campaign.steps?.length || 0}/{campaign.max_steps}</p>
+              
+              <div className="campaign-contacts-info">
+                <p><strong>📊 Contact Stats:</strong></p>
+                <div className="contact-stats">
+                  <span className="stat">
+                    <strong>{getContactsCount(campaign)}</strong> total
+                  </span>
+                  <span className="stat">
+                    <strong>{getContactsCount(campaign) - getRepliedContactsCount(campaign)}</strong> active
+                  </span>
+                  <span className="stat">
+                    <strong>{getRepliedContactsCount(campaign)}</strong> replied
+                  </span>
+                </div>
+              </div>
             </div>
 
             {campaign.steps && campaign.steps.length > 0 && (
-              <div className="campaign-steps">
-                <h4>Steps:</h4>
-                {campaign.steps.map(step => (
+              <div className="campaign-steps-preview">
+                <p><strong>📝 Steps Preview:</strong></p>
+                {campaign.steps.slice(0, 2).map((step: CampaignStep) => (
                   <div key={step.id} className="step-preview">
                     <span className="step-number">{step.step_number}</span>
                     <span className="step-message">{step.message.substring(0, 50)}...</span>
@@ -181,10 +247,16 @@ const CampaignsPage: React.FC = () => {
 
             <div className="campaign-actions">
               <button 
+                onClick={() => onEditCampaign(campaign.id)}
+                className="btn btn-info"
+              >
+                📋 Edit Campaign
+              </button>
+              <button 
                 onClick={() => handleEdit(campaign)} 
                 className="btn btn-secondary"
               >
-                ✏️ Edit
+                ✏️ Edit Details
               </button>
               <button 
                 onClick={() => handleDelete(campaign.id)} 

@@ -41,6 +41,7 @@ export interface UserInfo {
 export interface Contact {
   id: string;
   account_id: string;
+  campaign_id?: string;
   telegram_user_id: number;
   name?: string;
   tag?: string;
@@ -109,9 +110,10 @@ export const campaignsAPI = {
     api.get(`/campaigns/${campaignId}`).then(res => res.data),
   
   updateCampaign: (campaignId: string, data: {
-    account_id: string;
-    name: string;
-    interval_seconds: number;
+    account_id?: string;
+    name?: string;
+    interval_seconds?: number;
+    active?: boolean;
   }): Promise<Campaign> =>
     api.put(`/campaigns/${campaignId}`, data).then(res => res.data),
   
@@ -123,6 +125,21 @@ export const campaignsAPI = {
     message: string;
   }): Promise<CampaignStep> =>
     api.post(`/campaigns/${campaignId}/steps`, data).then(res => res.data),
+
+  updateCampaignStep: (campaignId: string, stepId: string, data: {
+    step_number: number;
+    message: string;
+  }): Promise<CampaignStep> =>
+    api.put(`/campaigns/${campaignId}/steps/${stepId}`, data).then(res => res.data),
+
+  deleteCampaignStep: (campaignId: string, stepId: string): Promise<void> =>
+    api.delete(`/campaigns/${campaignId}/steps/${stepId}`).then(res => res.data),
+
+  assignContactToCampaign: (campaignId: string, contactId: string): Promise<void> =>
+    api.post(`/campaigns/${campaignId}/contacts/${contactId}`).then(res => res.data),
+
+  removeContactFromCampaign: (campaignId: string, contactId: string): Promise<void> =>
+    api.delete(`/campaigns/${campaignId}/contacts/${contactId}`).then(res => res.data),
 };
 
 export const contactsAPI = {
@@ -140,6 +157,7 @@ export const contactsAPI = {
   updateContact: (contactId: string, data: {
     name?: string;
     tag?: string;
+    campaign_id?: string;
   }): Promise<Contact> =>
     api.put(`/contacts/${contactId}`, data).then(res => res.data),
   

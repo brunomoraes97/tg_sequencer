@@ -12,9 +12,13 @@ from telethon_manager import MANAGER
 def uuid_str() -> str:
     return str(uuid.uuid4())
 
-def due_contacts(db: Session, account_id: str, campaign: Campaign) -> list[Contact]:
+def due_contacts(db: Session, campaign: Campaign) -> list[Contact]:
+    """Get contacts that are due for next message in this specific campaign"""
     now = datetime.utcnow()
-    q = db.execute(select(Contact).where(Contact.account_id==account_id, Contact.replied==False))
+    q = db.execute(select(Contact).where(
+        Contact.campaign_id == campaign.id, 
+        Contact.replied == False
+    ))
     contacts: list[Contact] = list(q.scalars())
     due = []
     for c in contacts:
@@ -39,7 +43,7 @@ async def send_followups_for_account(account: Account):
         camps = db.execute(select(Campaign).where(Campaign.account_id==account.id, Campaign.active==True)).scalars()
         for camp in camps:
             steps = {s.step_number: s.message for s in camp.steps}
-            for c in due_contacts(db, account.id, camp):
+            for c in due_contacts(db, camp):  # Now using campaign-specific contacts
                 msg = steps.get(c.current_step)
                 if not msg:
                     continue
