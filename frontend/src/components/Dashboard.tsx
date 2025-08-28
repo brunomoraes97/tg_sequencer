@@ -57,16 +57,68 @@ const Dashboard: React.FC<DashboardProps> = ({ data, onRefresh }) => {
   };
 
   const getNextMessageStatus = (contact: any) => {
+    // If contact has replied, no next message
     if (contact.replied) {
-      return <span className="badge badge-success">✅ Replied</span>;
+      return <span className="badge badge-success">✅ Replied - Complete</span>;
     }
-    if (contact.next_message_time === 'now') {
-      return <span className="badge badge-urgent">🔥 NOW</span>;
+    
+    // Find the campaign for this contact
+    const campaign = data.campaigns.find(c => c.account_id === contact.account_id && c.active);
+    if (!campaign) {
+      return <span className="badge badge-error">❌ No Active Campaign</span>;
     }
-    if (contact.next_message_time) {
-      return <span className="badge badge-info">⏰ {formatDate(contact.next_message_time)}</span>;
+    
+    // Check if contact exceeded max steps
+    if (contact.current_step >= campaign.max_steps) {
+      return <span className="badge badge-success">✅ Campaign Complete</span>;
     }
-    return <span className="badge badge-gray">📋 Scheduled</span>;
+    
+    // If no last message, next message is now
+    if (!contact.last_message_at) {
+      return <span className="badge badge-urgent">� Ready to Send First Message</span>;
+    }
+    
+    try {
+      const lastMessage = new Date(contact.last_message_at);
+      const nextMessage = new Date(lastMessage.getTime() + (campaign.interval_seconds * 1000));
+      const now = new Date();
+      
+      const diff = nextMessage.getTime() - now.getTime();
+      
+      // Format date and time
+      const dateStr = nextMessage.toLocaleDateString('en-US', { 
+        weekday: 'short',
+        month: 'short', 
+        day: 'numeric',
+        year: nextMessage.getFullYear() !== now.getFullYear() ? 'numeric' : undefined
+      });
+      const timeStr = nextMessage.toLocaleTimeString('en-US', { 
+        hour: '2-digit', 
+        minute: '2-digit',
+        hour12: true
+      });
+      
+      const fullDateTime = `${dateStr} at ${timeStr}`;
+      
+      if (diff < 0) {
+        return <span className="badge badge-urgent">🔴 Overdue: {fullDateTime}</span>;
+      }
+      if (diff < 60 * 1000) {
+        return <span className="badge badge-warning">🟡 Due Now: {fullDateTime}</span>;
+      }
+      if (diff < 60 * 60 * 1000) {
+        const minutes = Math.round(diff / (60 * 1000));
+        return <span className="badge badge-warning">🟡 Due in {minutes}min: {fullDateTime}</span>;
+      }
+      if (diff < 24 * 60 * 60 * 1000) {
+        const hours = Math.round(diff / (60 * 60 * 1000));
+        return <span className="badge badge-info">🟢 Due in {hours}h: {fullDateTime}</span>;
+      }
+      
+      return <span className="badge badge-info">� Scheduled: {fullDateTime}</span>;
+    } catch {
+      return <span className="badge badge-error">❌ Invalid Date</span>;
+    }
   };
 
   return (
