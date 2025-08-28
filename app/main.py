@@ -1,6 +1,6 @@
 from __future__ import annotations
 import os, uuid
-from fastapi import FastAPI, Request, Depends, Form
+from fastapi import FastAPI, Request, Depends, Form, HTTPException
 from fastapi.responses import RedirectResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -26,10 +26,50 @@ def get_db():
         db.close()
 
 @app.get("/", response_class=HTMLResponse)
-def index(request: Request, db: Session = Depends(get_db)):
+async def index(request: Request, db: Session = Depends(get_db)):
+    from datetime import datetime, timedelta
+    from telethon_manager import MANAGER
+    
+    # Get basic data
     accounts = db.execute(select(Account)).scalars().all()
     campaigns = db.execute(select(Campaign)).scalars().all()
-    return templates.TemplateResponse("index.html", {"request": request, "accounts": accounts, "campaigns": campaigns})
+    contacts = db.execute(select(Contact)).scalars().all()
+    
+    # Enrich contacts with user info and next message time
+    enriched_contacts = []
+    for contact in contacts:
+        # Get account for this contact
+        account = next((acc for acc in accounts if acc.id == contact.account_id), None)
+        if not account or account.status != "active":
+            continue
+            
+        # Get user info from Telegram
+        try:
+            user_info = await MANAGER.get_user_info(account, contact.telegram_user_id)
+        except:
+            user_info = {'id': contact.telegram_user_id, 'full_name': f'User {contact.telegram_user_id}', 'username': None}
+        
+        # Calculate next message time
+        campaign = next((c for c in campaigns if c.account_id == contact.account_id and c.active), None)
+        next_message_time = None
+        if campaign and contact.last_message_at and not contact.replied and contact.current_step <= campaign.max_steps:
+            next_message_time = contact.last_message_at + timedelta(seconds=campaign.interval_seconds)
+        elif campaign and not contact.last_message_at and not contact.replied:
+            next_message_time = "Agora"
+            
+        enriched_contacts.append({
+            'contact': contact,
+            'user_info': user_info,
+            'next_message_time': next_message_time,
+            'campaign': campaign
+        })
+    
+    return templates.TemplateResponse("index.html", {
+        "request": request, 
+        "accounts": accounts, 
+        "campaigns": campaigns, 
+        "enriched_contacts": enriched_contacts
+    })
 
 # ---- Account onboarding ----
 @app.get("/accounts/new", response_class=HTMLResponse)
@@ -89,7 +129,33 @@ def contact_new(request: Request, db: Session = Depends(get_db)):
     return templates.TemplateResponse("contact_new.html", {"request": request, "accounts": accounts})
 
 @app.post("/contacts")
-def contact_create(account_id: str = Form(...), telegram_user_id: int = Form(...), db: Session = Depends(get_db)):
-    c = Contact(id=str(uuid.uuid4()), account_id=account_id, telegram_user_id=telegram_user_id)
-    db.add(c); db.commit()
-    return RedirectResponse(url=f"/", status_code=302)
+async def contact_create(request: Request, account_id: str = Form(...), identifier: str = Form(...), db: Session = Depends(get_db)):
+    """Create contact by resolving username or phone to Telegram user ID"""
+    # Get account
+    account = db.get(Account, account_id)
+    if not account:
+        raise HTTPException(404, "Account not found")
+    
+    try:
+        # Resolve identifier to user ID
+        from telethon_manager import MANAGER
+        telegram_user_id = await MANAGER.resolve_user_identifier(account, identifier.strip())
+        
+        # Create contact
+        c = Contact(id=str(uuid.uuid4()), account_id=account_id, telegram_user_id=telegram_user_id)
+        db.add(c)
+        db.commit()
+        
+        return RedirectResponse(url="/", status_code=302)
+        
+    except ValueError as e:
+        # Return error to user
+        accounts = db.execute(select(Account).where(Account.status=="active")).scalars().all()
+        return templates.TemplateResponse("contact_new.html", {
+            "request": request, 
+            "accounts": accounts, 
+            "error": str(e),
+            "identifier": identifier
+        })
+    except Exception as e:
+        raise HTTPException(500, f"Error creating contact: {str(e)}")

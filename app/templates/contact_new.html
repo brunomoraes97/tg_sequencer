@@ -2,6 +2,11 @@
 {% block content %}
 <div class="card">
   <h3>Novo contato</h3>
+  {% if error %}
+    <div style="background: #ffebee; border: 1px solid #f44336; padding: 10px; margin-bottom: 15px; border-radius: 4px; color: #c62828;">
+      <strong>Erro:</strong> {{ error }}
+    </div>
+  {% endif %}
   <form method="post" action="/contacts">
     <label>Conta
       <select name="account_id" required>
@@ -10,8 +15,9 @@
         {% endfor %}
       </select>
     </label>
-    <label>telegram_user_id
-      <input type="number" name="telegram_user_id" required />
+    <label>Username ou Telefone
+      <input type="text" name="identifier" placeholder="@username ou +5511999999999" value="{{ identifier or '' }}" required />
+      <small>Digite @username ou número com código do país</small>
     </label>
     <button>Salvar</button>
   </form>

@@ -1,28 +1,176 @@
 {% extends "base.html" %}
 {% block content %}
+
 <div class="card">
-  <h3>Contas</h3>
-  <table>
-    <tr><th>ID</th><th>Telefone</th><th>Status</th></tr>
-    {% for a in accounts %}
-    <tr><td>{{a.id}}</td><td>{{a.phone}}</td><td>{{a.status}}</td></tr>
-    {% endfor %}
-  </table>
+  <h3>📞 Contas Cadastradas</h3>
+  {% if accounts %}
+    <table>
+      <tr>
+        <th>Telefone</th>
+        <th>Status</th>
+        <th>ID</th>
+        <th>Criado em</th>
+      </tr>
+      {% for a in accounts %}
+      <tr>
+        <td><strong>{{a.phone}}</strong></td>
+        <td>
+          {% if a.status == 'active' %}
+            <span style="color: green;">✅ Ativo</span>
+          {% elif a.status == 'pending_code' %}
+            <span style="color: orange;">⏳ Aguardando código</span>
+          {% else %}
+            <span style="color: red;">❌ {{a.status}}</span>
+          {% endif %}
+        </td>
+        <td><small>{{a.id[:8]}}...</small></td>
+        <td>{{a.created_at or 'N/A'}}</td>
+      </tr>
+      {% endfor %}
+    </table>
+  {% else %}
+    <p>Nenhuma conta cadastrada. <a href="/accounts/new">Adicionar primeira conta</a></p>
+  {% endif %}
 </div>
 
 <div class="card">
-  <h3>Campanhas</h3>
-  <table>
-    <tr><th>Nome</th><th>Conta</th><th>Intervalo (s)</th><th>Passos</th><th>Ativa</th></tr>
-    {% for c in campaigns %}
-    <tr>
-      <td><a href="/campaigns/{{c.id}}">{{c.name}}</a></td>
-      <td>{{c.account_id}}</td>
-      <td>{{c.interval_seconds}}</td>
-      <td>{{c.max_steps}}</td>
-      <td>{{'✅' if c.active else '❌'}}</td>
-    </tr>
-    {% endfor %}
-  </table>
+  <h3>🎯 Campanhas Criadas</h3>
+  {% if campaigns %}
+    <table>
+      <tr>
+        <th>Nome</th>
+        <th>Conta</th>
+        <th>Status</th>
+        <th>Intervalo</th>
+        <th>Max Passos</th>
+        <th>Passos Configurados</th>
+        <th>Ações</th>
+      </tr>
+      {% for c in campaigns %}
+      <tr>
+        <td><strong>{{c.name}}</strong></td>
+        <td>
+          {% for a in accounts %}
+            {% if a.id == c.account_id %}
+              {{a.phone}}
+            {% endif %}
+          {% endfor %}
+        </td>
+        <td>
+          {% if c.active %}
+            <span style="color: green;">✅ Ativa</span>
+          {% else %}
+            <span style="color: red;">❌ Inativa</span>
+          {% endif %}
+        </td>
+        <td>{{c.interval_seconds}}s ({{(c.interval_seconds/60)|round(1)}}min)</td>
+        <td>{{c.max_steps}}</td>
+        <td>{{c.steps|length}}</td>
+        <td><a href="/campaigns/{{c.id}}">Ver detalhes</a></td>
+      </tr>
+      {% endfor %}
+    </table>
+  {% else %}
+    <p>Nenhuma campanha criada. <a href="/campaigns/new">Criar primeira campanha</a></p>
+  {% endif %}
 </div>
+
+<div class="card">
+  <h3>👥 Todos os Contatos Cadastrados</h3>
+  {% if enriched_contacts %}
+    <table>
+      <tr>
+        <th>Nome/Username</th>
+        <th>ID Telegram</th>
+        <th>Campanha</th>
+        <th>Passo Atual</th>
+        <th>Respondeu</th>
+        <th>Última Mensagem</th>
+        <th>Próxima Mensagem</th>
+        <th>Status</th>
+      </tr>
+      {% for item in enriched_contacts %}
+      {% set contact = item.contact %}
+      {% set user_info = item.user_info %}
+      {% set next_time = item.next_message_time %}
+      {% set campaign = item.campaign %}
+      <tr>
+        <td>
+          <strong>{{user_info.full_name or 'N/A'}}</strong>
+          {% if user_info.username %}
+            <br><small>@{{user_info.username}}</small>
+          {% endif %}
+          {% if user_info.is_verified %}
+            <span style="color: blue;">✓</span>
+          {% endif %}
+          {% if user_info.is_bot %}
+            <span style="color: purple;">🤖</span>
+          {% endif %}
+        </td>
+        <td>{{contact.telegram_user_id}}</td>
+        <td>
+          {% if campaign %}
+            {{campaign.name}}
+          {% else %}
+            <em>Sem campanha ativa</em>
+          {% endif %}
+        </td>
+        <td>{{contact.current_step}}/{{campaign.max_steps if campaign else 'N/A'}}</td>
+        <td>
+          {% if contact.replied %}
+            <span style="color: green;">✅ Sim</span>
+          {% else %}
+            <span style="color: orange;">⏳ Não</span>
+          {% endif %}
+        </td>
+        <td>
+          {% if contact.last_message_at %}
+            {{contact.last_message_at.strftime('%d/%m %H:%M')}}
+          {% else %}
+            <em>Nunca</em>
+          {% endif %}
+        </td>
+        <td>
+          {% if next_time == "Agora" %}
+            <strong style="color: red;">🔥 AGORA</strong>
+          {% elif next_time %}
+            {{next_time.strftime('%d/%m %H:%M')}}
+          {% elif contact.replied %}
+            <em style="color: green;">Respondeu</em>
+          {% elif contact.current_step > (campaign.max_steps if campaign else 0) %}
+            <em style="color: gray;">Finalizado</em>
+          {% else %}
+            <em>N/A</em>
+          {% endif %}
+        </td>
+        <td>
+          {% if not campaign %}
+            <span style="color: red;">❌ Sem campanha</span>
+          {% elif contact.replied %}
+            <span style="color: green;">✅ Respondeu</span>
+          {% elif contact.current_step > campaign.max_steps %}
+            <span style="color: gray;">🏁 Finalizado</span>
+          {% elif next_time == "Agora" %}
+            <span style="color: red;">🔥 Enviando</span>
+          {% else %}
+            <span style="color: blue;">⏳ Agendado</span>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </table>
+  {% else %}
+    <p>Nenhum contato cadastrado. <a href="/contacts/new">Adicionar primeiro contato</a></p>
+  {% endif %}
+</div>
+
+<div class="card">
+  <h3>🚀 Ações Rápidas</h3>
+  <p>
+    <a href="/accounts/new" class="button">➕ Nova Conta</a>
+    <a href="/campaigns/new" class="button">🎯 Nova Campanha</a>
+    <a href="/contacts/new" class="button">👤 Novo Contato</a>
+  </p>
+</div>
+
 {% endblock %}

@@ -90,6 +90,47 @@ class TelethonManager:
             self.clients[account.id] = client
             return client
 
+    async def resolve_user_identifier(self, account: Account, identifier: str) -> int:
+        """
+        Resolve username (@user) or phone (+5511999999999) to Telegram user ID
+        """
+        client = await self.get_client(account)
+        try:
+            entity = await client.get_entity(identifier)
+            return entity.id
+        except Exception as e:
+            raise ValueError(f"Could not find user '{identifier}': {str(e)}")
+
+    async def get_user_info(self, account: Account, user_id: int) -> dict:
+        """
+        Get detailed information about a Telegram user
+        """
+        client = await self.get_client(account)
+        try:
+            user = await client.get_entity(user_id)
+            return {
+                'id': user.id,
+                'first_name': getattr(user, 'first_name', None),
+                'last_name': getattr(user, 'last_name', None),
+                'username': getattr(user, 'username', None),
+                'phone': getattr(user, 'phone', None),
+                'is_bot': getattr(user, 'bot', False),
+                'is_verified': getattr(user, 'verified', False),
+                'full_name': f"{getattr(user, 'first_name', '')} {getattr(user, 'last_name', '')}".strip()
+            }
+        except Exception as e:
+            return {
+                'id': user_id,
+                'first_name': None,
+                'last_name': None,
+                'username': None,
+                'phone': None,
+                'is_bot': False,
+                'is_verified': False,
+                'full_name': f"User {user_id}",
+                'error': str(e)
+            }
+
     async def ensure_reply_handler(self, account: Account):
         if account.id in self.reply_handlers_installed:
             return
