@@ -3,13 +3,13 @@ import os, uuid
 from fastapi import FastAPI, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
-from sqlalchemy import select
+from sqlalchemy import select, delete
 from datetime import datetime, timedelta
 from typing import List
 
 # Use absolute imports
 from db import SessionLocal
-from models import Account, Campaign, CampaignStep, Contact
+from models import Account, Campaign, CampaignStep, Contact, MessageLog
 from telethon_manager import MANAGER
 from schemas import *
 
@@ -311,6 +311,10 @@ def delete_contact(contact_id: str, db: Session = Depends(get_db)):
     if not contact:
         raise HTTPException(404, "Contact not found")
     
+    # Delete related messages first
+    db.execute(delete(MessageLog).where(MessageLog.contact_id == contact_id))
+    
+    # Delete the contact
     db.delete(contact)
     db.commit()
     return {"message": "Contact deleted successfully"}

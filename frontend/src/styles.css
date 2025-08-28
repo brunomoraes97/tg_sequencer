@@ -990,7 +990,8 @@ tr:hover {
 .search-input-wrapper {
   position: relative;
   flex: 1;
-  min-width: 300px;
+  min-width: 250px;
+  max-width: calc(100% - 140px); /* Reserve space for filters button */
 }
 
 .search-icon {
