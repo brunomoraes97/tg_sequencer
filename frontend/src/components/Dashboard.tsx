@@ -83,17 +83,17 @@ const Dashboard: React.FC<DashboardProps> = ({ data, onRefresh }) => {
       const nextMessage = new Date(lastMessage.getTime() + (campaign.interval_seconds * 1000));
       
       // Format date and time
-      const dateStr = nextMessage.toLocaleDateString('pt-BR', { 
+      const dateStr = nextMessage.toLocaleDateString('en-US', { 
         day: '2-digit',
         month: '2-digit',
         year: nextMessage.getFullYear() !== new Date().getFullYear() ? 'numeric' : undefined
       });
-      const timeStr = nextMessage.toLocaleTimeString('pt-BR', { 
+      const timeStr = nextMessage.toLocaleTimeString('en-US', { 
         hour: '2-digit', 
         minute: '2-digit'
       });
       
-      return <span>{dateStr} às {timeStr}</span>;
+      return <span>{dateStr} at {timeStr}</span>;
     } catch {
       return <span className="text-muted">Invalid Date</span>;
     }

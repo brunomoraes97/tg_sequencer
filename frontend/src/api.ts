@@ -98,6 +98,7 @@ export const campaignsAPI = {
     account_id: string;
     name: string;
     interval_seconds: number;
+    max_steps?: number;
   }): Promise<Campaign> =>
     api.post('/campaigns', data).then(res => res.data),
   

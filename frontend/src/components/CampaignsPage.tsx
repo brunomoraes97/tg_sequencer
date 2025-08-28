@@ -30,9 +30,9 @@ const CampaignsPage: React.FC = () => {
       setCampaigns(campaignsData);
       setAccounts(accountsData);
     } catch (err: any) {
-      const errorMessage = err.response?.data?.detail || 'Erro ao carregar campanhas';
+      const errorMessage = err.response?.data?.detail || 'Error loading campaigns';
       setError(errorMessage);
-      showError('Erro', errorMessage);
+      showError('Error', errorMessage);
     } finally {
       setLoading(false);
     }
@@ -58,26 +58,26 @@ const CampaignsPage: React.FC = () => {
       const updated = await campaignsAPI.updateCampaign(editingCampaign.id, editForm);
       setCampaigns(campaigns.map(camp => camp.id === updated.id ? updated : camp));
       setEditingCampaign(null);
-      showSuccess('Sucesso', 'Campanha atualizada com sucesso!');
+      showSuccess('Success', 'Campaign updated successfully!');
     } catch (err: any) {
-      const errorMessage = err.response?.data?.detail || 'Erro ao atualizar campanha';
+      const errorMessage = err.response?.data?.detail || 'Error updating campaign';
       setError(errorMessage);
-      showError('Erro', errorMessage);
+      showError('Error', errorMessage);
     }
   };
 
     const handleDelete = async (id: string) => {
     // eslint-disable-next-line no-restricted-globals
-    if (!confirm('Tem certeza que deseja excluir esta campanha?')) return;
+    if (!confirm('Are you sure you want to delete this campaign?')) return;
 
     try {
       await campaignsAPI.deleteCampaign(id);
       setCampaigns(campaigns.filter(camp => camp.id !== id));
-      showSuccess('Sucesso', 'Campanha excluída com sucesso!');
+      showSuccess('Success', 'Campaign deleted successfully!');
     } catch (err: any) {
-      const errorMessage = err.response?.data?.detail || 'Erro ao excluir campanha';
+      const errorMessage = err.response?.data?.detail || 'Error deleting campaign';
       setError(errorMessage);
-      showError('Erro', errorMessage);
+      showError('Error', errorMessage);
     }
   };
 
@@ -126,8 +126,8 @@ const CampaignsPage: React.FC = () => {
       {showAlert && (
         <Alert
           type="info"
-          title="Dica de Produtividade"
-          message="Use campanhas para automatizar suas sequências de mensagens e aumentar o engajamento com seus contatos."
+          title="Productivity Tip"
+          message="Use campaigns to automate your message sequences and increase engagement with your contacts."
           onClose={() => setShowAlert(false)}
         />
       )}

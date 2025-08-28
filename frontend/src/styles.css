@@ -288,6 +288,83 @@ tr:hover {
   transform: none;
 }
 
+.btn-danger {
+  background: #dc3545;
+  color: white;
+}
+
+.btn-danger:hover {
+  background: #c82333;
+}
+
+.btn-danger-small {
+  background: #dc3545;
+  color: white;
+  padding: 0.25rem 0.5rem;
+  font-size: 0.8rem;
+  border-radius: 4px;
+}
+
+.btn-danger-small:hover {
+  background: #c82333;
+}
+
+/* Steps Container */
+.steps-container {
+  border: 2px dashed #e9ecef;
+  border-radius: 8px;
+  padding: 1rem;
+  background: #f8f9fa;
+}
+
+.step-form {
+  background: white;
+  border: 1px solid #dee2e6;
+  border-radius: 8px;
+  padding: 1rem;
+  margin-bottom: 1rem;
+}
+
+.step-form:last-child {
+  margin-bottom: 0;
+}
+
+.step-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+
+.step-header .step-number {
+  font-weight: 600;
+  color: #495057;
+  font-size: 0.9rem;
+}
+
+.step-form textarea {
+  width: 100%;
+  min-height: 80px;
+  resize: vertical;
+  font-family: inherit;
+}
+
+.add-step-btn {
+  width: 100%;
+  background: #28a745 !important;
+  color: white;
+  margin-top: 1rem;
+  border: 2px dashed #28a745;
+  background-color: transparent !important;
+  color: #28a745 !important;
+}
+
+.add-step-btn:hover {
+  background: #28a745 !important;
+  color: white !important;
+  border-color: #28a745;
+}
+
 /* Interval Buttons */
 .interval-buttons {
   display: flex;
@@ -982,10 +1059,9 @@ tr:hover {
 
 .search-bar {
   display: flex;
-  gap: 0.75rem;
+  gap: 1rem;
   align-items: center;
   flex-wrap: nowrap;
-  justify-content: space-between;
 }
 
 .search-input-wrapper {
