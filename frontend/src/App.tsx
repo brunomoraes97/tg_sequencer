@@ -3,9 +3,6 @@ import './styles.css';
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 import { dashboardAPI, DashboardData, Account } from './api';
 import Dashboard from './components/Dashboard';
-import AccountForm from './components/AccountForm';
-import CampaignForm from './components/CampaignForm';
-import ContactForm from './components/ContactForm';
 import AccountsPage from './components/AccountsPage';
 import CampaignsPage from './components/CampaignsPage';
 import ContactsPage from './components/ContactsPage';
@@ -36,11 +33,6 @@ function App() {
   useEffect(() => {
     loadDashboard();
   }, []);
-
-  const handleSuccess = () => {
-    setView('dashboard');
-    loadDashboard();
-  };
 
   return (
     <ToastProvider>

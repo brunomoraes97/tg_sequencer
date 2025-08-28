@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { contactsAPI, Contact, Account, accountsAPI, Campaign, campaignsAPI } from '../api';
 import ContactForm from './ContactForm';
-import { useToast } from '../contexts/ToastContext';
 import Alert from './Alert';
 import SearchFilters from './SearchFilters';
 
@@ -17,7 +16,7 @@ const ContactsPage: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [campaignFilter, setCampaignFilter] = useState('all');
-  const { showSuccess, showError } = useToast();
+  // const { showSuccess, showError } = useToast(); // Uncomment when needed
   const [editForm, setEditForm] = useState({ name: '', tag: '' });
 
   const loadContacts = async () => {

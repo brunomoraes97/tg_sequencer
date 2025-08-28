@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { campaignsAPI, Campaign, Account, accountsAPI } from '../api';
 import CampaignForm from './CampaignForm';
 import { useToast } from '../contexts/ToastContext';
@@ -19,7 +19,7 @@ const CampaignsPage: React.FC = () => {
     interval_seconds: 86400
   });
 
-  const loadCampaigns = async () => {
+  const loadCampaigns = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
@@ -36,11 +36,11 @@ const CampaignsPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [showError]);
 
   useEffect(() => {
     loadCampaigns();
-  }, []);
+  }, [loadCampaigns]);
 
   const handleEdit = (campaign: Campaign) => {
     setEditingCampaign(campaign);
