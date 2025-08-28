@@ -5,6 +5,12 @@ from datetime import datetime
 # Account schemas
 class AccountCreate(BaseModel):
     phone: str
+    name: Optional[str] = None
+    tag: Optional[str] = None
+
+class AccountUpdate(BaseModel):
+    name: Optional[str] = None
+    tag: Optional[str] = None
 
 class AccountVerify(BaseModel):
     code: str
@@ -13,6 +19,8 @@ class AccountVerify(BaseModel):
 class AccountResponse(BaseModel):
     id: str
     phone: str
+    name: Optional[str] = None
+    tag: Optional[str] = None
     status: str
     created_at: Optional[datetime]
     
@@ -54,6 +62,12 @@ class CampaignResponse(BaseModel):
 class ContactCreate(BaseModel):
     account_id: str
     identifier: str  # username or phone
+    name: Optional[str] = None
+    tag: Optional[str] = None
+
+class ContactUpdate(BaseModel):
+    name: Optional[str] = None
+    tag: Optional[str] = None
 
 class UserInfo(BaseModel):
     id: int
@@ -69,6 +83,8 @@ class ContactResponse(BaseModel):
     id: str
     account_id: str
     telegram_user_id: int
+    name: Optional[str] = None
+    tag: Optional[str] = None
     current_step: int
     replied: bool
     last_message_at: Optional[datetime]

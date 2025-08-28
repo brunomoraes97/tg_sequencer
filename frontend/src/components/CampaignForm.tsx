@@ -10,12 +10,17 @@ interface CampaignFormProps {
 const CampaignForm: React.FC<CampaignFormProps> = ({ accounts, onSuccess, onCancel }) => {
   const [accountId, setAccountId] = useState('');
   const [name, setName] = useState('');
-  const [intervalSeconds, setIntervalSeconds] = useState(86400); // 24 hours
-  const [maxSteps, setMaxSteps] = useState(3);
+  const [intervalValue, setIntervalValue] = useState(24);
+  const [intervalUnit, setIntervalUnit] = useState('hours');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const activeAccounts = accounts.filter(acc => acc.status === 'active');
+
+  const getIntervalSeconds = () => {
+    const multipliers = { seconds: 1, minutes: 60, hours: 3600, days: 86400 };
+    return intervalValue * multipliers[intervalUnit as keyof typeof multipliers];
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -26,8 +31,7 @@ const CampaignForm: React.FC<CampaignFormProps> = ({ accounts, onSuccess, onCanc
       await campaignsAPI.createCampaign({
         account_id: accountId,
         name,
-        interval_seconds: intervalSeconds,
-        max_steps: maxSteps,
+        interval_seconds: getIntervalSeconds(),
       });
       onSuccess();
     } catch (err: any) {
@@ -35,10 +39,6 @@ const CampaignForm: React.FC<CampaignFormProps> = ({ accounts, onSuccess, onCanc
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleIntervalChange = (minutes: number) => {
-    setIntervalSeconds(minutes * 60);
   };
 
   if (activeAccounts.length === 0) {
@@ -92,58 +92,26 @@ const CampaignForm: React.FC<CampaignFormProps> = ({ accounts, onSuccess, onCanc
 
         <div className="form-group">
           <label htmlFor="interval">Message Interval</label>
-          <div className="interval-buttons">
-            <button 
-              type="button" 
-              onClick={() => handleIntervalChange(5)}
-              className={intervalSeconds === 300 ? 'active' : ''}
+          <div className="interval-input">
+            <input
+              type="number"
+              value={intervalValue}
+              onChange={(e) => setIntervalValue(Number(e.target.value))}
+              placeholder="Interval"
+              min="1"
+              required
+            />
+            <select
+              value={intervalUnit}
+              onChange={(e) => setIntervalUnit(e.target.value)}
             >
-              5 minutes
-            </button>
-            <button 
-              type="button" 
-              onClick={() => handleIntervalChange(60)}
-              className={intervalSeconds === 3600 ? 'active' : ''}
-            >
-              1 hour
-            </button>
-            <button 
-              type="button" 
-              onClick={() => handleIntervalChange(1440)}
-              className={intervalSeconds === 86400 ? 'active' : ''}
-            >
-              24 hours
-            </button>
-            <button 
-              type="button" 
-              onClick={() => handleIntervalChange(4320)}
-              className={intervalSeconds === 259200 ? 'active' : ''}
-            >
-              3 days
-            </button>
+              <option value="seconds">seconds</option>
+              <option value="minutes">minutes</option>
+              <option value="hours">hours</option>
+              <option value="days">days</option>
+            </select>
           </div>
-          <input
-            type="number"
-            value={Math.round(intervalSeconds / 60)}
-            onChange={(e) => setIntervalSeconds(Number(e.target.value) * 60)}
-            placeholder="Minutes"
-            min="1"
-          />
-          <small>Current: {Math.round(intervalSeconds / 60)} minutes between messages</small>
-        </div>
-
-        <div className="form-group">
-          <label htmlFor="maxSteps">Maximum Steps</label>
-          <input
-            type="number"
-            id="maxSteps"
-            value={maxSteps}
-            onChange={(e) => setMaxSteps(Number(e.target.value))}
-            min="1"
-            max="10"
-            required
-          />
-          <small>How many follow-up messages to send before stopping</small>
+          <small>Messages will be sent every {intervalValue} {intervalUnit}</small>
         </div>
 
         {error && <div className="error">{error}</div>}

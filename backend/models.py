@@ -8,6 +8,8 @@ class Account(Base):
     __tablename__ = "accounts"
     id = Column(String, primary_key=True)               # uuid string
     phone = Column(String, nullable=False)
+    name = Column(String, nullable=True)                # user-friendly name
+    tag = Column(String, nullable=True)                 # user tag/label
     status = Column(String, default="pending_code")    # pending_code|active|error
     string_session = Column(Text)                       # encrypted string session
     created_at = Column(DateTime, default=datetime.utcnow)
@@ -41,6 +43,8 @@ class Contact(Base):
     id = Column(String, primary_key=True)
     account_id = Column(String, ForeignKey("accounts.id"), nullable=False)
     telegram_user_id = Column(BigInteger, nullable=False)
+    name = Column(String, nullable=True)                # user-friendly name
+    tag = Column(String, nullable=True)                 # user tag/label
     replied = Column(Boolean, default=False)
     current_step = Column(Integer, default=1)
     last_message_at = Column(DateTime, nullable=True)

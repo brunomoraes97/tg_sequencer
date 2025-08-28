@@ -52,6 +52,8 @@ async def get_dashboard(db: Session = Depends(get_db)):
                 id=contact.id,
                 account_id=contact.account_id,
                 telegram_user_id=contact.telegram_user_id,
+                name=contact.name,
+                tag=contact.tag,
                 current_step=contact.current_step,
                 replied=contact.replied,
                 last_message_at=contact.last_message_at
@@ -87,6 +89,8 @@ async def get_dashboard(db: Session = Depends(get_db)):
             id=contact.id,
             account_id=contact.account_id,
             telegram_user_id=contact.telegram_user_id,
+            name=contact.name,
+            tag=contact.tag,
             current_step=contact.current_step,
             replied=contact.replied,
             last_message_at=contact.last_message_at,
@@ -138,6 +142,46 @@ def get_accounts(db: Session = Depends(get_db)):
     accounts = db.execute(select(Account)).scalars().all()
     return [AccountResponse.from_orm(acc) for acc in accounts]
 
+@app.put("/api/accounts/{account_id}", response_model=AccountResponse)
+def update_account(account_id: str, account_data: AccountUpdate, db: Session = Depends(get_db)):
+    """Update account name and tag"""
+    acc = db.get(Account, account_id)
+    if not acc:
+        raise HTTPException(404, "Account not found")
+    
+    if account_data.name is not None:
+        acc.name = account_data.name
+    if account_data.tag is not None:
+        acc.tag = account_data.tag
+    acc.updated_at = datetime.utcnow()
+    db.commit()
+    return AccountResponse.from_orm(acc)
+
+@app.delete("/api/accounts/{account_id}")
+def delete_account(account_id: str, db: Session = Depends(get_db)):
+    """Delete account and all related data"""
+    acc = db.get(Account, account_id)
+    if not acc:
+        raise HTTPException(404, "Account not found")
+    
+    # Delete related campaigns and contacts
+    campaigns = db.execute(select(Campaign).where(Campaign.account_id == account_id)).scalars().all()
+    for campaign in campaigns:
+        # Delete campaign steps
+        steps = db.execute(select(CampaignStep).where(CampaignStep.campaign_id == campaign.id)).scalars().all()
+        for step in steps:
+            db.delete(step)
+        db.delete(campaign)
+    
+    # Delete contacts
+    contacts = db.execute(select(Contact).where(Contact.account_id == account_id)).scalars().all()
+    for contact in contacts:
+        db.delete(contact)
+    
+    db.delete(acc)
+    db.commit()
+    return {"message": "Account deleted successfully"}
+
 # Campaign endpoints
 @app.post("/api/campaigns", response_model=CampaignResponse)
 def create_campaign(campaign_data: CampaignCreate, db: Session = Depends(get_db)):
@@ -158,6 +202,35 @@ def get_campaigns(db: Session = Depends(get_db)):
     """Get all campaigns with steps"""
     campaigns = db.execute(select(Campaign)).scalars().all()
     return [CampaignResponse.from_orm(camp) for camp in campaigns]
+
+@app.put("/api/campaigns/{campaign_id}", response_model=CampaignResponse)
+def update_campaign(campaign_id: str, campaign_data: CampaignCreate, db: Session = Depends(get_db)):
+    """Update campaign"""
+    camp = db.get(Campaign, campaign_id)
+    if not camp:
+        raise HTTPException(404, "Campaign not found")
+    
+    camp.name = campaign_data.name
+    camp.interval_seconds = campaign_data.interval_seconds
+    # Remove max_steps update since it's determined by steps count
+    db.commit()
+    return CampaignResponse.from_orm(camp)
+
+@app.delete("/api/campaigns/{campaign_id}")
+def delete_campaign(campaign_id: str, db: Session = Depends(get_db)):
+    """Delete campaign and all its steps"""
+    camp = db.get(Campaign, campaign_id)
+    if not camp:
+        raise HTTPException(404, "Campaign not found")
+    
+    # Delete all steps
+    steps = db.execute(select(CampaignStep).where(CampaignStep.campaign_id == campaign_id)).scalars().all()
+    for step in steps:
+        db.delete(step)
+    
+    db.delete(camp)
+    db.commit()
+    return {"message": "Campaign deleted successfully"}
 
 @app.get("/api/campaigns/{campaign_id}", response_model=CampaignResponse)
 def get_campaign(campaign_id: str, db: Session = Depends(get_db)):
@@ -197,7 +270,9 @@ async def create_contact(contact_data: ContactCreate, db: Session = Depends(get_
         contact = Contact(
             id=str(uuid.uuid4()),
             account_id=contact_data.account_id,
-            telegram_user_id=telegram_user_id
+            telegram_user_id=telegram_user_id,
+            name=contact_data.name,
+            tag=contact_data.tag
         )
         db.add(contact)
         db.commit()
@@ -214,6 +289,31 @@ def get_contacts(db: Session = Depends(get_db)):
     """Get all contacts"""
     contacts = db.execute(select(Contact)).scalars().all()
     return [ContactResponse.from_orm(contact) for contact in contacts]
+
+@app.put("/api/contacts/{contact_id}", response_model=ContactResponse)
+def update_contact(contact_id: str, contact_data: ContactUpdate, db: Session = Depends(get_db)):
+    """Update contact name and tag"""
+    contact = db.get(Contact, contact_id)
+    if not contact:
+        raise HTTPException(404, "Contact not found")
+    
+    if contact_data.name is not None:
+        contact.name = contact_data.name
+    if contact_data.tag is not None:
+        contact.tag = contact_data.tag
+    db.commit()
+    return ContactResponse.from_orm(contact)
+
+@app.delete("/api/contacts/{contact_id}")
+def delete_contact(contact_id: str, db: Session = Depends(get_db)):
+    """Delete contact"""
+    contact = db.get(Contact, contact_id)
+    if not contact:
+        raise HTTPException(404, "Contact not found")
+    
+    db.delete(contact)
+    db.commit()
+    return {"message": "Contact deleted successfully"}
 
 if __name__ == "__main__":
     import uvicorn

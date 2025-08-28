@@ -400,3 +400,362 @@ tr:hover {
     padding: 0.5rem;
   }
 }
+
+/* New Page Styles */
+.page-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 2rem;
+}
+
+.page-header {
+  text-align: center;
+  margin-bottom: 3rem;
+}
+
+.page-header h1 {
+  color: white;
+  font-size: 2.5rem;
+  margin-bottom: 0.5rem;
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+}
+
+.page-header p {
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 1.1rem;
+}
+
+/* Grid Layouts */
+.accounts-grid, .campaigns-grid, .contacts-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+  gap: 2rem;
+  margin-bottom: 2rem;
+}
+
+/* Card Styles */
+.account-card, .campaign-card, .contact-card {
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(10px);
+  border-radius: 15px;
+  padding: 1.5rem;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.account-card:hover, .campaign-card:hover, .contact-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15);
+}
+
+.account-header, .campaign-header, .contact-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+  padding-bottom: 1rem;
+  border-bottom: 2px solid #f0f0f0;
+}
+
+.account-header h3, .campaign-header h3, .contact-header h3 {
+  margin: 0;
+  color: #333;
+  font-size: 1.2rem;
+}
+
+.account-details, .campaign-details, .contact-details {
+  margin-bottom: 1rem;
+}
+
+.account-details p, .campaign-details p, .contact-details p {
+  margin: 0.5rem 0;
+  color: #666;
+  font-size: 0.9rem;
+}
+
+.account-actions, .campaign-actions, .contact-actions {
+  display: flex;
+  gap: 0.75rem;
+  justify-content: flex-end;
+}
+
+/* Status Badges */
+.status-badge {
+  padding: 0.25rem 0.75rem;
+  border-radius: 20px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.status-badge.active {
+  background: #d4edda;
+  color: #155724;
+}
+
+.status-badge.pending_code {
+  background: #fff3cd;
+  color: #856404;
+}
+
+.status-badge.error {
+  background: #f8d7da;
+  color: #721c24;
+}
+
+.status-badge.replied {
+  background: #d4edda;
+  color: #155724;
+}
+
+.status-badge.inactive {
+  background: #f8d7da;
+  color: #721c24;
+}
+
+/* Tags */
+.tag {
+  background: #e3f2fd;
+  color: #1565c0;
+  padding: 0.2rem 0.5rem;
+  border-radius: 10px;
+  font-size: 0.8rem;
+  font-weight: 500;
+}
+
+/* Modal Styles */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.modal {
+  background: white;
+  padding: 2rem;
+  border-radius: 15px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  max-width: 500px;
+  width: 90%;
+  max-height: 80vh;
+  overflow-y: auto;
+}
+
+.modal h3 {
+  margin-top: 0;
+  margin-bottom: 1.5rem;
+  color: #333;
+}
+
+/* Empty State */
+.empty-state {
+  text-align: center;
+  padding: 3rem;
+  background: rgba(255, 255, 255, 0.9);
+  border-radius: 15px;
+  margin: 2rem 0;
+}
+
+.empty-state h3 {
+  color: #666;
+  margin-bottom: 1rem;
+}
+
+.empty-state p {
+  color: #888;
+}
+
+/* Campaign Steps */
+.campaign-steps {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid #eee;
+}
+
+.campaign-steps h4 {
+  margin: 0 0 0.75rem 0;
+  color: #333;
+  font-size: 0.9rem;
+}
+
+.step-preview {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+  padding: 0.5rem;
+  background: #f8f9fa;
+  border-radius: 8px;
+}
+
+.step-number {
+  background: #667eea;
+  color: white;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.8rem;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.step-message {
+  color: #666;
+  font-size: 0.9rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* User Info */
+.user-info {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid #eee;
+}
+
+.user-info h4 {
+  margin: 0 0 0.75rem 0;
+  color: #333;
+  font-size: 0.9rem;
+}
+
+.user-info p {
+  font-size: 0.8rem;
+  margin: 0.25rem 0;
+}
+
+.verified, .bot {
+  display: inline-block;
+  padding: 0.2rem 0.5rem;
+  border-radius: 10px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  margin-left: 0.5rem;
+}
+
+.verified {
+  background: #d4edda;
+  color: #155724;
+}
+
+.bot {
+  background: #cce5ff;
+  color: #004085;
+}
+
+/* Form Improvements */
+.interval-input {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.interval-input input {
+  flex: 1;
+}
+
+.interval-input select {
+  min-width: 100px;
+}
+
+.nav-divider {
+  width: 1px;
+  background: rgba(255, 255, 255, 0.3);
+  margin: 0.5rem 0;
+}
+
+/* Help Page Styles */
+.help-content {
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(10px);
+  border-radius: 15px;
+  padding: 2rem;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+}
+
+.help-section {
+  margin-bottom: 2rem;
+  padding-bottom: 2rem;
+  border-bottom: 1px solid #eee;
+}
+
+.help-section:last-child {
+  border-bottom: none;
+}
+
+.help-section h2 {
+  color: #333;
+  margin-bottom: 1rem;
+  font-size: 1.5rem;
+}
+
+.help-item {
+  margin-bottom: 1.5rem;
+}
+
+.help-item h3 {
+  color: #555;
+  margin-bottom: 0.5rem;
+  font-size: 1.1rem;
+}
+
+.help-item p, .help-item ul {
+  color: #666;
+  line-height: 1.6;
+}
+
+.help-item ul {
+  margin-left: 1rem;
+}
+
+.help-item li {
+  margin-bottom: 0.5rem;
+}
+
+.help-footer {
+  margin-top: 2rem;
+  padding-top: 2rem;
+  border-top: 2px solid #eee;
+  text-align: center;
+}
+
+.help-footer p {
+  color: #666;
+  font-style: italic;
+}
+
+/* Responsive Improvements */
+@media (max-width: 768px) {
+  .page-container {
+    padding: 1rem;
+  }
+  
+  .accounts-grid, .campaigns-grid, .contacts-grid {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+  
+  .account-actions, .campaign-actions, .contact-actions {
+    flex-direction: column;
+  }
+  
+  .modal {
+    padding: 1rem;
+    margin: 1rem;
+  }
+  
+  .interval-input {
+    flex-direction: column;
+  }
+}

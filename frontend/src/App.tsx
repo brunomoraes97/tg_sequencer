@@ -6,8 +6,12 @@ import Dashboard from './components/Dashboard';
 import AccountForm from './components/AccountForm';
 import CampaignForm from './components/CampaignForm';
 import ContactForm from './components/ContactForm';
+import AccountsPage from './components/AccountsPage';
+import CampaignsPage from './components/CampaignsPage';
+import ContactsPage from './components/ContactsPage';
+import HelpPage from './components/HelpPage';
 
-type View = 'dashboard' | 'create-account' | 'create-campaign' | 'create-contact';
+type View = 'dashboard' | 'accounts' | 'campaigns' | 'contacts' | 'help' | 'create-account' | 'create-campaign' | 'create-contact';
 
 function App() {
   const [view, setView] = useState<View>('dashboard');
@@ -49,10 +53,35 @@ function App() {
             📊 Dashboard
           </button>
           <button 
+            onClick={() => setView('accounts')}
+            className={view === 'accounts' ? 'active' : ''}
+          >
+            📞 Accounts
+          </button>
+          <button 
+            onClick={() => setView('campaigns')}
+            className={view === 'campaigns' ? 'active' : ''}
+          >
+            🎯 Campaigns
+          </button>
+          <button 
+            onClick={() => setView('contacts')}
+            className={view === 'contacts' ? 'active' : ''}
+          >
+            👥 Contacts
+          </button>
+          <button 
+            onClick={() => setView('help')}
+            className={view === 'help' ? 'active' : ''}
+          >
+            ❓ Help
+          </button>
+          <div className="nav-divider"></div>
+          <button 
             onClick={() => setView('create-account')}
             className={view === 'create-account' ? 'active' : ''}
           >
-            📞 New Account
+            ➕ New Account
           </button>
           <button 
             onClick={() => setView('create-campaign')}
@@ -102,6 +131,11 @@ function App() {
             onCancel={() => setView('dashboard')} 
           />
         )}
+
+        {view === 'accounts' && <AccountsPage />}
+        {view === 'campaigns' && <CampaignsPage />}
+        {view === 'contacts' && <ContactsPage />}
+        {view === 'help' && <HelpPage />}
       </main>
     </div>
   );

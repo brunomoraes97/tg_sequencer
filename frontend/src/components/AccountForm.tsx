@@ -8,6 +8,8 @@ interface AccountFormProps {
 
 const AccountForm: React.FC<AccountFormProps> = ({ onSuccess, onCancel }) => {
   const [phone, setPhone] = useState('');
+  const [name, setName] = useState('');
+  const [tag, setTag] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pendingAccount, setPendingAccount] = useState<Account | null>(null);
@@ -20,7 +22,11 @@ const AccountForm: React.FC<AccountFormProps> = ({ onSuccess, onCancel }) => {
     setError(null);
     
     try {
-      const account = await accountsAPI.createAccount(phone);
+      const account = await accountsAPI.createAccount({
+        phone,
+        name: name || undefined,
+        tag: tag || undefined
+      });
       setPendingAccount(account);
     } catch (err: any) {
       setError(err.response?.data?.detail || 'Error creating account');
@@ -108,6 +114,30 @@ const AccountForm: React.FC<AccountFormProps> = ({ onSuccess, onCancel }) => {
             required
           />
           <small>Include country code (e.g., +1 for US, +55 for Brazil)</small>
+        </div>
+
+        <div className="form-group">
+          <label htmlFor="name">Account Name (Optional)</label>
+          <input
+            type="text"
+            id="name"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="e.g., Personal Account, Business Account"
+          />
+          <small>A friendly name to identify this account</small>
+        </div>
+
+        <div className="form-group">
+          <label htmlFor="tag">Tag (Optional)</label>
+          <input
+            type="text"
+            id="tag"
+            value={tag}
+            onChange={(e) => setTag(e.target.value)}
+            placeholder="e.g., personal, work, client"
+          />
+          <small>A tag for organizing your accounts</small>
         </div>
 
         {error && <div className="error">{error}</div>}

@@ -10,6 +10,8 @@ interface ContactFormProps {
 const ContactForm: React.FC<ContactFormProps> = ({ accounts, onSuccess, onCancel }) => {
   const [accountId, setAccountId] = useState('');
   const [identifier, setIdentifier] = useState('');
+  const [name, setName] = useState('');
+  const [tag, setTag] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -24,6 +26,8 @@ const ContactForm: React.FC<ContactFormProps> = ({ accounts, onSuccess, onCancel
       await contactsAPI.createContact({
         account_id: accountId,
         identifier: identifier.trim(),
+        name: name || undefined,
+        tag: tag || undefined,
       });
       onSuccess();
     } catch (err: any) {
@@ -83,6 +87,30 @@ const ContactForm: React.FC<ContactFormProps> = ({ accounts, onSuccess, onCancel
           <small>
             Enter a Telegram username (e.g., @johndoe) or phone number (e.g., +1234567890)
           </small>
+        </div>
+
+        <div className="form-group">
+          <label htmlFor="name">Contact Name (Optional)</label>
+          <input
+            type="text"
+            id="name"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="e.g., John Doe, Lead #123"
+          />
+          <small>A friendly name to identify this contact</small>
+        </div>
+
+        <div className="form-group">
+          <label htmlFor="tag">Tag (Optional)</label>
+          <input
+            type="text"
+            id="tag"
+            value={tag}
+            onChange={(e) => setTag(e.target.value)}
+            placeholder="e.g., lead, customer, prospect"
+          />
+          <small>A tag for organizing your contacts</small>
         </div>
 
         {error && <div className="error">{error}</div>}
