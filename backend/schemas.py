@@ -57,11 +57,13 @@ class AccountResponse(BaseModel):
 class CampaignStepCreate(BaseModel):
     step_number: int
     message: str
+    interval_seconds: Optional[int] = None
 
 class CampaignStepResponse(BaseModel):
     id: str
     step_number: int
     message: str
+    interval_seconds: Optional[int] = None
     
     class Config:
         from_attributes = True

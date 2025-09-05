@@ -222,7 +222,7 @@ const CampaignsPage: React.FC<CampaignsPageProps> = ({ onCreateCampaign, onEditC
             
             <div className="campaign-info">
               <p><strong>Account:</strong> {getAccountName(campaign.account_id)}</p>
-              <p><strong>Interval:</strong> {formatInterval(campaign.interval_seconds)}</p>
+              <p><strong>Default Interval:</strong> {formatInterval(campaign.interval_seconds)}</p>
               <p><strong>Steps:</strong> {campaign.steps?.length || 0}/{campaign.max_steps}</p>
               
               <div className="campaign-contacts-info">
@@ -244,10 +244,13 @@ const CampaignsPage: React.FC<CampaignsPageProps> = ({ onCreateCampaign, onEditC
             {campaign.steps && campaign.steps.length > 0 && (
               <div className="campaign-steps-preview">
                 <p><strong>📝 Steps Preview:</strong></p>
-                {campaign.steps.slice(0, 2).map((step: CampaignStep) => (
+        {campaign.steps.slice(0, 2).map((step: CampaignStep) => (
                   <div key={step.id} className="step-preview">
                     <span className="step-number">{step.step_number}</span>
                     <span className="step-message">{step.message.substring(0, 50)}...</span>
+          {typeof step.interval_seconds === 'number' && step.interval_seconds > 0 && (
+                      <span className="step-interval"> ⏱ {formatInterval(step.interval_seconds)}</span>
+                    )}
                   </div>
                 ))}
               </div>

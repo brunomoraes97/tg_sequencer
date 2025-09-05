@@ -12,7 +12,12 @@ const CampaignDetailPage: React.FC = () => {
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [loading, setLoading] = useState(true);
   const [editingStep, setEditingStep] = useState<CampaignStep | null>(null);
-  const [newStep, setNewStep] = useState({ step_number: 1, message: '' });
+  const [newStep, setNewStep] = useState<{ step_number: number; message: string; interval_value: number; interval_unit: 'seconds'|'minutes'|'hours'|'days'; }>({ step_number: 1, message: '', interval_value: 24, interval_unit: 'hours' });
+
+  const toSeconds = (value: number, unit: 'seconds'|'minutes'|'hours'|'days') => {
+    const multipliers = { seconds: 1, minutes: 60, hours: 3600, days: 86400 } as const;
+    return value * multipliers[unit];
+  };
   const [showNewStepForm, setShowNewStepForm] = useState(false);
 
   const loadCampaign = async () => {
@@ -44,7 +49,8 @@ const CampaignDetailPage: React.FC = () => {
     try {
       await campaignsAPI.updateCampaignStep(campaign.id, editingStep.id, {
         step_number: editingStep.step_number,
-        message: editingStep.message
+        message: editingStep.message,
+        interval_seconds: editingStep.interval_seconds,
       });
       
       await loadCampaign();
@@ -72,9 +78,13 @@ const CampaignDetailPage: React.FC = () => {
     if (!campaign) return;
     
     try {
-      await campaignsAPI.addCampaignStep(campaign.id, newStep);
+      await campaignsAPI.addCampaignStep(campaign.id, {
+        step_number: newStep.step_number,
+        message: newStep.message,
+        interval_seconds: toSeconds(newStep.interval_value, newStep.interval_unit),
+      });
       await loadCampaign();
-      setNewStep({ step_number: 1, message: '' });
+      setNewStep({ step_number: 1, message: '', interval_value: 24, interval_unit: 'hours' });
       setShowNewStepForm(false);
       showSuccess('Success', 'Step added successfully!');
     } catch (err: any) {
@@ -216,6 +226,26 @@ const CampaignDetailPage: React.FC = () => {
                 rows={4}
               />
             </div>
+            <div className="form-group">
+              <label>Interval</label>
+              <div className="interval-input">
+                <input
+                  type="number"
+                  value={newStep.interval_value}
+                  onChange={(e) => setNewStep({ ...newStep, interval_value: parseInt(e.target.value) || 1 })}
+                  min={1}
+                />
+                <select
+                  value={newStep.interval_unit}
+                  onChange={(e) => setNewStep({ ...newStep, interval_unit: e.target.value as any })}
+                >
+                  <option value="seconds">seconds</option>
+                  <option value="minutes">minutes</option>
+                  <option value="hours">hours</option>
+                  <option value="days">days</option>
+                </select>
+              </div>
+            </div>
             <div className="form-actions">
               <button onClick={handleAddStep} className="btn btn-primary">
                 💾 Add Step
@@ -255,6 +285,16 @@ const CampaignDetailPage: React.FC = () => {
                 })}
                 rows={4}
               />
+            </div>
+            <div className="form-group">
+              <label>Interval (seconds)</label>
+              <input
+                type="number"
+                value={editingStep.interval_seconds ?? 0}
+                onChange={(e) => setEditingStep({ ...editingStep, interval_seconds: parseInt(e.target.value) || 0 })}
+                min={0}
+              />
+              <small>0 means use campaign default</small>
             </div>
             <div className="form-actions">
               <button onClick={handleUpdateStep} className="btn btn-primary">

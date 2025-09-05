@@ -10,30 +10,41 @@ interface CampaignFormProps {
 interface StepForm {
   step_number: number;
   message: string;
+  interval_value: number;
+  interval_unit: 'seconds' | 'minutes' | 'hours' | 'days';
 }
 
 const CampaignForm: React.FC<CampaignFormProps> = ({ accounts, onSuccess, onCancel }) => {
   const [accountId, setAccountId] = useState('');
   const [name, setName] = useState('');
-  const [intervalValue, setIntervalValue] = useState(24);
-  const [intervalUnit, setIntervalUnit] = useState('hours');
+  // Default interval used to prefill each step
+  const [defaultIntervalValue, setDefaultIntervalValue] = useState(24);
+  const [defaultIntervalUnit, setDefaultIntervalUnit] = useState<'seconds'|'minutes'|'hours'|'days'>('hours');
   const [maxSteps, setMaxSteps] = useState(3);
   const [steps, setSteps] = useState<StepForm[]>([
-    { step_number: 1, message: '' }
+    { step_number: 1, message: '', interval_value: 24, interval_unit: 'hours' }
   ]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const activeAccounts = accounts.filter(acc => acc.status === 'active');
 
-  const getIntervalSeconds = () => {
-    const multipliers = { seconds: 1, minutes: 60, hours: 3600, days: 86400 };
-    return intervalValue * multipliers[intervalUnit as keyof typeof multipliers];
+  const toSeconds = (value: number, unit: StepForm['interval_unit']) => {
+    const multipliers = { seconds: 1, minutes: 60, hours: 3600, days: 86400 } as const;
+    return value * multipliers[unit];
   };
 
   const addStep = () => {
     if (steps.length < maxSteps) {
-      setSteps([...steps, { step_number: steps.length + 1, message: '' }]);
+      setSteps([
+        ...steps, 
+        { 
+          step_number: steps.length + 1, 
+          message: '',
+          interval_value: defaultIntervalValue,
+          interval_unit: defaultIntervalUnit
+        }
+      ]);
     }
   };
 
@@ -52,6 +63,13 @@ const CampaignForm: React.FC<CampaignFormProps> = ({ accounts, onSuccess, onCanc
   const updateStep = (index: number, message: string) => {
     const newSteps = [...steps];
     newSteps[index].message = message;
+    setSteps(newSteps);
+  };
+
+  const updateStepInterval = (index: number, value: number, unit?: StepForm['interval_unit']) => {
+    const newSteps = [...steps];
+    newSteps[index].interval_value = value;
+    if (unit) newSteps[index].interval_unit = unit;
     setSteps(newSteps);
   };
 
@@ -80,15 +98,17 @@ const CampaignForm: React.FC<CampaignFormProps> = ({ accounts, onSuccess, onCanc
       const campaign = await campaignsAPI.createCampaign({
         account_id: accountId,
         name,
-        interval_seconds: getIntervalSeconds(),
+        // Keep a default at campaign level for any steps without override (fallback)
+        interval_seconds: toSeconds(defaultIntervalValue, defaultIntervalUnit),
         max_steps: maxSteps,
       });
 
       // Add all steps to the campaign
-      for (const step of steps) {
+    for (const step of steps) {
         await campaignsAPI.addCampaignStep(campaign.id, {
           step_number: step.step_number,
-          message: step.message,
+      message: step.message,
+      interval_seconds: toSeconds(step.interval_value, step.interval_unit),
         });
       }
 
@@ -164,19 +184,20 @@ const CampaignForm: React.FC<CampaignFormProps> = ({ accounts, onSuccess, onCanc
         </div>
 
         <div className="form-group">
-          <label htmlFor="interval">Message Interval</label>
+          <label htmlFor="default-interval">Default Step Interval</label>
           <div className="interval-input">
             <input
+              id="default-interval"
               type="number"
-              value={intervalValue}
-              onChange={(e) => setIntervalValue(Number(e.target.value))}
+              value={defaultIntervalValue}
+              onChange={(e) => setDefaultIntervalValue(Number(e.target.value))}
               placeholder="Interval"
               min="1"
               required
             />
             <select
-              value={intervalUnit}
-              onChange={(e) => setIntervalUnit(e.target.value)}
+              value={defaultIntervalUnit}
+              onChange={(e) => setDefaultIntervalUnit(e.target.value as StepForm['interval_unit'])}
             >
               <option value="seconds">seconds</option>
               <option value="minutes">minutes</option>
@@ -184,7 +205,7 @@ const CampaignForm: React.FC<CampaignFormProps> = ({ accounts, onSuccess, onCanc
               <option value="days">days</option>
             </select>
           </div>
-          <small>Messages will be sent every {intervalValue} {intervalUnit}</small>
+          <small>New steps will default to {defaultIntervalValue} {defaultIntervalUnit}</small>
         </div>
 
         <div className="form-group">
@@ -211,6 +232,24 @@ const CampaignForm: React.FC<CampaignFormProps> = ({ accounts, onSuccess, onCanc
                   rows={3}
                   required
                 />
+                <div className="interval-input step-interval">
+                  <input
+                    type="number"
+                    value={step.interval_value}
+                    onChange={(e) => updateStepInterval(index, Number(e.target.value))}
+                    min={1}
+                    required
+                  />
+                  <select
+                    value={step.interval_unit}
+                    onChange={(e) => updateStepInterval(index, step.interval_value, e.target.value as StepForm['interval_unit'])}
+                  >
+                    <option value="seconds">seconds</option>
+                    <option value="minutes">minutes</option>
+                    <option value="hours">hours</option>
+                    <option value="days">days</option>
+                  </select>
+                </div>
               </div>
             ))}
             

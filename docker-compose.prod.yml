@@ -5,8 +5,9 @@ services:
     container_name: tg_migrate
     env_file: .env
     environment:
-      - RUN_MIGRATIONS=true
-    command: python migrate_add_auth.py
+      - DB_HOST=db
+      - DB_PORT=5432
+    command: python migrate_all.py
     depends_on:
       db:
         condition: service_healthy
@@ -27,6 +28,9 @@ services:
     build: ./backend
     container_name: tg_api
     env_file: .env
+    environment:
+      - DB_HOST=db
+      - DB_PORT=5432
     ports:
       - "8000:8000"
     command: python -m uvicorn main:app --host 0.0.0.0 --port 8000
@@ -35,7 +39,7 @@ services:
         condition: service_healthy
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/"]
+      test: ["CMD", "curl", "-f", "http://localhost:8000/docs"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -45,6 +49,9 @@ services:
     build: ./backend
     container_name: tg_worker
     env_file: .env
+    environment:
+      - DB_HOST=db
+      - DB_PORT=5432
     command: python -m worker
     depends_on:
       db:

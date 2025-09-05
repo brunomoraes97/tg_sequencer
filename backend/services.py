@@ -20,6 +20,8 @@ def due_contacts(db: Session, campaign: Campaign) -> list[Contact]:
         Contact.replied == False
     ))
     contacts: list[Contact] = list(q.scalars())
+    # Build step lookup including per-step intervals
+    step_by_number: dict[int, CampaignStep] = {s.step_number: s for s in campaign.steps}
     due = []
     for c in contacts:
         if c.current_step > campaign.max_steps:
@@ -27,8 +29,17 @@ def due_contacts(db: Session, campaign: Campaign) -> list[Contact]:
         if not c.last_message_at:
             due.append(c)
             continue
+        # Determine interval for the next message: step-specific overrides campaign default
+        current_step = c.current_step
+        step = step_by_number.get(current_step)
+        # Use step override if positive; otherwise fall back to campaign default
+        if step and step.interval_seconds and step.interval_seconds > 0:
+            interval_seconds = step.interval_seconds
+        else:
+            interval_seconds = campaign.interval_seconds
+
         delta = now - c.last_message_at
-        if delta.total_seconds() >= campaign.interval_seconds:
+        if delta.total_seconds() >= interval_seconds:
             due.append(c)
     return due
 
@@ -42,9 +53,10 @@ async def send_followups_for_account(account: Account):
             return
         camps = db.execute(select(Campaign).where(Campaign.account_id==account.id, Campaign.active==True)).scalars()
         for camp in camps:
-            steps = {s.step_number: s.message for s in camp.steps}
+            steps = {s.step_number: s for s in camp.steps}
             for c in due_contacts(db, camp):  # Now using campaign-specific contacts
-                msg = steps.get(c.current_step)
+                step = steps.get(c.current_step)
+                msg = step.message if step else None
                 if not msg:
                     continue
                 try:

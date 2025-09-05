@@ -140,11 +140,14 @@ async def get_dashboard(current_user: User = Depends(get_current_active_user), d
                 full_name=f"User {contact.telegram_user_id}"
             )
         
-        # Calculate next message time
-        campaign = next((c for c in campaigns if c.account_id == contact.account_id and c.active), None)
+        # Calculate next message time (use the specific assigned campaign)
+        campaign = next((c for c in campaigns if c.id == contact.campaign_id), None)
         next_message_time = None
         if campaign and contact.last_message_at and not contact.replied and contact.current_step <= campaign.max_steps:
-            next_time = contact.last_message_at + timedelta(seconds=campaign.interval_seconds)
+            # Use per-step interval if available
+            step = next((s for s in campaign.steps if s.step_number == contact.current_step), None)
+            interval_seconds = step.interval_seconds if (step and step.interval_seconds is not None) else campaign.interval_seconds
+            next_time = contact.last_message_at + timedelta(seconds=interval_seconds)
             next_message_time = next_time.isoformat()
         elif campaign and not contact.last_message_at and not contact.replied:
             next_message_time = "now"
@@ -346,11 +349,14 @@ def add_campaign_step(campaign_id: str, step_data: CampaignStepCreate, current_u
     if not campaign:
         raise HTTPException(404, "Campaign not found")
     
+    # Normalize interval: <=0 means use default (None)
+    normalized_interval = step_data.interval_seconds if (step_data.interval_seconds is None or step_data.interval_seconds > 0) else None
     step = CampaignStep(
         id=str(uuid.uuid4()),
         campaign_id=campaign_id,
         step_number=step_data.step_number,
-        message=step_data.message
+        message=step_data.message,
+        interval_seconds=normalized_interval
     )
     db.add(step)
     db.commit()
@@ -370,6 +376,7 @@ def update_campaign_step(campaign_id: str, step_id: str, step_data: CampaignStep
     
     step.step_number = step_data.step_number
     step.message = step_data.message
+    step.interval_seconds = step_data.interval_seconds if (step_data.interval_seconds is None or step_data.interval_seconds > 0) else None
     db.commit()
     return CampaignStepResponse.model_validate(step)
 

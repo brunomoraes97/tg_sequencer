@@ -38,6 +38,7 @@ export interface CampaignStep {
   id: string;
   step_number: number;
   message: string;
+  interval_seconds?: number;
 }
 
 export interface UserInfo {
@@ -184,13 +185,15 @@ export const campaignsAPI = {
   
   addCampaignStep: (campaignId: string, data: {
     step_number: number;
-    message: string;
+  message: string;
+  interval_seconds?: number;
   }): Promise<CampaignStep> =>
     api.post(`/campaigns/${campaignId}/steps`, data).then(res => res.data),
 
   updateCampaignStep: (campaignId: string, stepId: string, data: {
     step_number: number;
-    message: string;
+  message: string;
+  interval_seconds?: number;
   }): Promise<CampaignStep> =>
     api.put(`/campaigns/${campaignId}/steps/${stepId}`, data).then(res => res.data),
 

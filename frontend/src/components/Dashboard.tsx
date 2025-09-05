@@ -20,11 +20,13 @@ const Dashboard: React.FC<DashboardProps> = ({ data, onRefresh }) => {
       if (contact.replied) return false;
       if (!contact.last_message_at) return true;
       
-      const campaign = data.campaigns.find(c => c.account_id === contact.account_id && c.active);
+      const campaign = contact.campaign_id ? data.campaigns.find(c => c.id === contact.campaign_id) : undefined;
       if (!campaign || contact.current_step >= campaign.max_steps) return false;
       
       const lastMessage = new Date(contact.last_message_at);
-      const nextMessage = new Date(lastMessage.getTime() + (campaign.interval_seconds * 1000));
+      const step = campaign.steps?.find(s => s.step_number === contact.current_step);
+      const intervalSeconds = step?.interval_seconds ?? campaign.interval_seconds;
+      const nextMessage = new Date(lastMessage.getTime() + (intervalSeconds * 1000));
       return nextMessage <= new Date();
     }).length;
     
@@ -63,7 +65,7 @@ const Dashboard: React.FC<DashboardProps> = ({ data, onRefresh }) => {
     }
     
     // Find the campaign for this contact
-    const campaign = data.campaigns.find(c => c.account_id === contact.account_id && c.active);
+  const campaign = contact.campaign_id ? data.campaigns.find(c => c.id === contact.campaign_id) : undefined;
     if (!campaign) {
       return <span className="text-muted">No Active Campaign</span>;
     }
@@ -80,7 +82,9 @@ const Dashboard: React.FC<DashboardProps> = ({ data, onRefresh }) => {
     
     try {
       const lastMessage = new Date(contact.last_message_at);
-      const nextMessage = new Date(lastMessage.getTime() + (campaign.interval_seconds * 1000));
+  const step = campaign.steps?.find(s => s.step_number === contact.current_step);
+  const intervalSeconds = step?.interval_seconds ?? campaign.interval_seconds;
+  const nextMessage = new Date(lastMessage.getTime() + (intervalSeconds * 1000));
       
       // Format date and time
       const dateStr = nextMessage.toLocaleDateString('en-US', { 

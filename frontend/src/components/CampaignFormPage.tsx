@@ -10,17 +10,20 @@ interface CampaignFormPageProps {
 interface StepForm {
   step_number: number;
   message: string;
+  interval_value: number;
+  interval_unit: 'seconds' | 'minutes' | 'hours' | 'days';
 }
 
 const CampaignFormPage: React.FC<CampaignFormPageProps> = ({ onSuccess, onCancel }) => {
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [accountId, setAccountId] = useState('');
   const [name, setName] = useState('');
-  const [intervalValue, setIntervalValue] = useState(24);
-  const [intervalUnit, setIntervalUnit] = useState('hours');
+  // Default interval to prefill each step
+  const [defaultIntervalValue, setDefaultIntervalValue] = useState(24);
+  const [defaultIntervalUnit, setDefaultIntervalUnit] = useState<'seconds'|'minutes'|'hours'|'days'>('hours');
   const [maxSteps, setMaxSteps] = useState(3);
   const [steps, setSteps] = useState<StepForm[]>([
-    { step_number: 1, message: '' }
+    { step_number: 1, message: '', interval_value: 24, interval_unit: 'hours' }
   ]);
   const [loading, setLoading] = useState(false);
   const [loadingAccounts, setLoadingAccounts] = useState(true);
@@ -51,14 +54,17 @@ const CampaignFormPage: React.FC<CampaignFormPageProps> = ({ onSuccess, onCancel
 
   const activeAccounts = accounts.filter(acc => acc.status === 'active');
 
-  const getIntervalSeconds = () => {
-    const multipliers = { seconds: 1, minutes: 60, hours: 3600, days: 86400 };
-    return intervalValue * multipliers[intervalUnit as keyof typeof multipliers];
+  const toSeconds = (value: number, unit: StepForm['interval_unit']) => {
+    const multipliers = { seconds: 1, minutes: 60, hours: 3600, days: 86400 } as const;
+    return value * multipliers[unit];
   };
 
   const addStep = () => {
     if (steps.length < maxSteps) {
-      setSteps([...steps, { step_number: steps.length + 1, message: '' }]);
+      setSteps([
+        ...steps,
+        { step_number: steps.length + 1, message: '', interval_value: defaultIntervalValue, interval_unit: defaultIntervalUnit }
+      ]);
     }
   };
 
@@ -77,6 +83,12 @@ const CampaignFormPage: React.FC<CampaignFormPageProps> = ({ onSuccess, onCancel
   const updateStep = (index: number, message: string) => {
     const newSteps = [...steps];
     newSteps[index].message = message;
+    setSteps(newSteps);
+  };
+  const updateStepInterval = (index: number, value: number, unit?: StepForm['interval_unit']) => {
+    const newSteps = [...steps];
+    newSteps[index].interval_value = value;
+    if (unit) newSteps[index].interval_unit = unit;
     setSteps(newSteps);
   };
 
@@ -105,15 +117,16 @@ const CampaignFormPage: React.FC<CampaignFormPageProps> = ({ onSuccess, onCancel
       const campaign = await campaignsAPI.createCampaign({
         account_id: accountId,
         name,
-        interval_seconds: getIntervalSeconds(),
+        interval_seconds: toSeconds(defaultIntervalValue, defaultIntervalUnit),
         max_steps: maxSteps,
       });
 
       // Add all steps to the campaign
-      for (const step of steps) {
+    for (const step of steps) {
         await campaignsAPI.addCampaignStep(campaign.id, {
           step_number: step.step_number,
-          message: step.message,
+      message: step.message,
+      interval_seconds: toSeconds(step.interval_value, step.interval_unit),
         });
       }
 
@@ -240,20 +253,21 @@ const CampaignFormPage: React.FC<CampaignFormPageProps> = ({ onSuccess, onCancel
             </div>
 
             <div className="form-group">
-              <label htmlFor="interval">Message Interval *</label>
+              <label htmlFor="default-interval">Default Step Interval *</label>
               <div className="interval-input">
                 <input
+                  id="default-interval"
                   type="number"
-                  value={intervalValue}
-                  onChange={(e) => setIntervalValue(Number(e.target.value))}
+                  value={defaultIntervalValue}
+                  onChange={(e) => setDefaultIntervalValue(Number(e.target.value))}
                   placeholder="Interval"
                   min="1"
                   required
                   className="form-input interval-number"
                 />
                 <select
-                  value={intervalUnit}
-                  onChange={(e) => setIntervalUnit(e.target.value)}
+                  value={defaultIntervalUnit}
+                  onChange={(e) => setDefaultIntervalUnit(e.target.value as StepForm['interval_unit'])}
                   className="form-select interval-unit"
                 >
                   <option value="seconds">seconds</option>
@@ -262,7 +276,7 @@ const CampaignFormPage: React.FC<CampaignFormPageProps> = ({ onSuccess, onCancel
                   <option value="days">days</option>
                 </select>
               </div>
-              <small>Time between each follow-up message</small>
+              <small>Default time between steps. You can override per step below.</small>
             </div>
           </div>
         </div>
@@ -307,6 +321,26 @@ const CampaignFormPage: React.FC<CampaignFormPageProps> = ({ onSuccess, onCancel
                   />
                   <div className="character-count">
                     {step.message.length} characters
+                  </div>
+                  <div className="interval-input step-interval">
+                    <input
+                      type="number"
+                      value={step.interval_value}
+                      onChange={(e) => updateStepInterval(index, Number(e.target.value))}
+                      min={1}
+                      required
+                      className="form-input interval-number"
+                    />
+                    <select
+                      value={step.interval_unit}
+                      onChange={(e) => updateStepInterval(index, step.interval_value, e.target.value as StepForm['interval_unit'])}
+                      className="form-select interval-unit"
+                    >
+                      <option value="seconds">seconds</option>
+                      <option value="minutes">minutes</option>
+                      <option value="hours">hours</option>
+                      <option value="days">days</option>
+                    </select>
                   </div>
                 </div>
               </div>

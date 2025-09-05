@@ -111,8 +111,10 @@ const ContactsPage: React.FC = () => {
     if (!contact.last_message_at) return 'Agora';
     
     try {
-      const lastMessage = new Date(contact.last_message_at);
-      const nextMessage = new Date(lastMessage.getTime() + (campaign.interval_seconds * 1000));
+  const lastMessage = new Date(contact.last_message_at);
+  const step = campaign.steps?.find(s => s.step_number === contact.current_step);
+  const intervalSeconds = step?.interval_seconds ?? campaign.interval_seconds;
+  const nextMessage = new Date(lastMessage.getTime() + (intervalSeconds * 1000));
       
       const dateStr = nextMessage.toLocaleDateString('pt-BR', { 
         day: '2-digit',
@@ -166,7 +168,7 @@ const ContactsPage: React.FC = () => {
         if (statusFilter === 'replied' && !contact.replied) return false;
         if (statusFilter === 'active' && contact.replied) return false;
         if (statusFilter === 'completed') {
-          const campaign = campaigns.find(c => c.account_id === contact.account_id && c.active);
+          const campaign = contact.campaign_id ? campaigns.find(c => c.id === contact.campaign_id) : undefined;
           const maxSteps = campaign ? campaign.max_steps : 3;
           if (contact.current_step < maxSteps && !contact.replied) return false;
         }
@@ -174,8 +176,8 @@ const ContactsPage: React.FC = () => {
 
       // Campaign filter
       if (campaignFilter !== 'all') {
-        const campaign = campaigns.find(c => c.account_id === contact.account_id);
-        if (!campaign || campaign.id !== campaignFilter) return false;
+  const campaign = contact.campaign_id ? campaigns.find(c => c.id === contact.campaign_id) : undefined;
+  if (!campaign || campaign.id !== campaignFilter) return false;
       }
 
       return true;
@@ -309,11 +311,13 @@ const ContactsPage: React.FC = () => {
                     <div className="campaign-info">
                       <p><strong>📋 Campaign:</strong> <span className="campaign-name">{campaign.name}</span></p>
                       <p><strong>Progress:</strong> {Math.min(contact.current_step, campaign.max_steps)}/{campaign.max_steps} steps</p>
-                      <p><strong>Interval:</strong> {(() => {
-                        if (campaign.interval_seconds >= 86400) return `${Math.round(campaign.interval_seconds / 86400)} days`;
-                        if (campaign.interval_seconds >= 3600) return `${Math.round(campaign.interval_seconds / 3600)} hours`;
-                        if (campaign.interval_seconds >= 60) return `${Math.round(campaign.interval_seconds / 60)} minutes`;
-                        return `${campaign.interval_seconds} seconds`;
+                      <p><strong>Current Step Interval:</strong> {(() => {
+                        const step = campaign.steps?.find(s => s.step_number === contact.current_step);
+                        const seconds = step?.interval_seconds ?? campaign.interval_seconds;
+                        if (seconds >= 86400) return `${Math.round(seconds / 86400)} days`;
+                        if (seconds >= 3600) return `${Math.round(seconds / 3600)} hours`;
+                        if (seconds >= 60) return `${Math.round(seconds / 60)} minutes`;
+                        return `${seconds} seconds`;
                       })()}</p>
                       {!campaign.active && <p className="warning-text">⚠️ Campaign is inactive</p>}
                     </div>

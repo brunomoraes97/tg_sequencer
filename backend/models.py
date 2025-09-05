@@ -50,6 +50,8 @@ class CampaignStep(Base):
     campaign_id = Column(String, ForeignKey("campaigns.id"), nullable=False)
     step_number = Column(Integer, nullable=False)
     message = Column(Text, nullable=False)
+    # Optional per-step interval; if null, fall back to campaign.interval_seconds
+    interval_seconds = Column(Integer, nullable=True)
 
     campaign = relationship("Campaign", back_populates="steps")
 

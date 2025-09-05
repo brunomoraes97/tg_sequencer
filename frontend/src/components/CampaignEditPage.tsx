@@ -14,8 +14,13 @@ const CampaignEditPage: React.FC<CampaignEditPageProps> = ({ campaignId, onBack 
   const [allContacts, setAllContacts] = useState<Contact[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [loading, setLoading] = useState(true);
-  const [newStep, setNewStep] = useState({ step_number: 1, message: '' });
+    const [newStep, setNewStep] = useState<{ step_number: number; message: string; interval_seconds: number; }>({ step_number: 1, message: '', interval_seconds: 86400 });
   const [editingStep, setEditingStep] = useState<CampaignStep | null>(null);
+
+  const toSeconds = (value: number, unit: 'seconds'|'minutes'|'hours'|'days') => {
+    const multipliers = { seconds: 1, minutes: 60, hours: 3600, days: 86400 } as const;
+    return value * multipliers[unit];
+  };
 
   const loadData = async () => {
     if (!campaignId) return;
@@ -45,9 +50,13 @@ const CampaignEditPage: React.FC<CampaignEditPageProps> = ({ campaignId, onBack 
     if (!campaign || !newStep.message.trim()) return;
     
     try {
-      await campaignsAPI.addCampaignStep(campaign.id, newStep);
+      await campaignsAPI.addCampaignStep(campaign.id, {
+        step_number: newStep.step_number,
+        message: newStep.message,
+        interval_seconds: newStep.interval_seconds,
+      });
       await loadData();
-      setNewStep({ step_number: (campaign.steps?.length || 0) + 1, message: '' });
+  setNewStep({ step_number: (campaign.steps?.length || 0) + 1, message: '', interval_seconds: campaign.interval_seconds });
       showSuccess('Success', 'Step added successfully!');
     } catch (err: any) {
       showError('Error', err.response?.data?.detail || 'Error adding step');
@@ -60,7 +69,8 @@ const CampaignEditPage: React.FC<CampaignEditPageProps> = ({ campaignId, onBack 
     try {
       await campaignsAPI.updateCampaignStep(campaign.id, editingStep.id, {
         step_number: editingStep.step_number,
-        message: editingStep.message
+        message: editingStep.message,
+        interval_seconds: editingStep.interval_seconds,
       });
       
       await loadData();
@@ -159,6 +169,17 @@ const CampaignEditPage: React.FC<CampaignEditPageProps> = ({ campaignId, onBack 
                 />
               </div>
               <div className="form-group">
+                <label>Interval (seconds)</label>
+                <input
+                  type="number"
+                  min={1}
+                  value={newStep.interval_seconds}
+                  onChange={(e) => setNewStep({ ...newStep, interval_seconds: parseInt(e.target.value) || 1 })}
+                  className="form-input"
+                />
+              </div>
+              {/* per-step interval in seconds only */}
+              <div className="form-group">
                 <label>&nbsp;</label>
                 <button 
                   onClick={handleAddStep} 
@@ -179,35 +200,54 @@ const CampaignEditPage: React.FC<CampaignEditPageProps> = ({ campaignId, onBack 
                   <div className="step-edit-form">
                     <div className="form-row">
                       <div className="form-group">
+                        <label>Step</label>
                         <input
                           type="number"
                           value={editingStep.step_number}
-                          onChange={(e) => setEditingStep({ 
-                            ...editingStep, 
+                          onChange={(e) => setEditingStep({
+                            ...editingStep,
                             step_number: parseInt(e.target.value) || 1
                           })}
-                          min="1"
+                          min={1}
                           className="form-input"
                         />
                       </div>
                       <div className="form-group flex-grow">
+                        <label>Message</label>
                         <textarea
                           value={editingStep.message}
-                          onChange={(e) => setEditingStep({ 
-                            ...editingStep, 
-                            message: e.target.value 
+                          onChange={(e) => setEditingStep({
+                            ...editingStep,
+                            message: e.target.value
                           })}
                           className="form-textarea"
                           rows={3}
                         />
                       </div>
                       <div className="form-group">
-                        <button onClick={handleUpdateStep} className="btn btn-primary btn-sm">
-                          💾 Save
-                        </button>
-                        <button onClick={() => setEditingStep(null)} className="btn btn-secondary btn-sm">
-                          Cancel
-                        </button>
+                        <label>Interval (seconds)</label>
+                        <input
+                          type="number"
+                          min={0}
+                          value={editingStep.interval_seconds ?? 0}
+                          onChange={(e) => setEditingStep({
+                            ...editingStep,
+                            interval_seconds: parseInt(e.target.value) || 0
+                          })}
+                          className="form-input"
+                        />
+                        <small>0 means use campaign default</small>
+                      </div>
+                      <div className="form-group">
+                        <label>&nbsp;</label>
+                        <div>
+                          <button onClick={handleUpdateStep} className="btn btn-primary btn-sm">
+                            💾 Save
+                          </button>
+                          <button onClick={() => setEditingStep(null)} className="btn btn-secondary btn-sm" style={{ marginLeft: 8 }}>
+                            Cancel
+                          </button>
+                        </div>
                       </div>
                     </div>
                   </div>
