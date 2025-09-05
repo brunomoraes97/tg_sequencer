@@ -2,6 +2,19 @@ import axios from 'axios';
 
 const API_BASE_URL = 'http://localhost:8000/api';
 
+// Auth interfaces
+export interface User {
+  id: string;
+  email: string;
+  is_active: boolean;
+  created_at: string;
+}
+
+export interface LoginResponse {
+  access_token: string;
+  token_type: string;
+}
+
 export interface Account {
   id: string;
   phone: string;
@@ -64,6 +77,55 @@ const api = axios.create({
     'Content-Type': 'application/json',
   },
 });
+
+// Add token to requests
+api.interceptors.request.use((config) => {
+  const token = localStorage.getItem('access_token');
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
+});
+
+// Handle auth errors
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 401) {
+      localStorage.removeItem('access_token');
+      window.location.reload();
+    }
+    return Promise.reject(error);
+  }
+);
+
+export const authAPI = {
+  login: (email: string, password: string): Promise<LoginResponse> =>
+    axios.post(`${API_BASE_URL}/auth/login`, 
+      new URLSearchParams({
+        username: email,
+        password: password
+      }),
+      {
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        }
+      }
+    ).then(res => res.data),
+  
+  register: (email: string, password: string): Promise<User> =>
+    axios.post(`${API_BASE_URL}/auth/register`, {
+      email,
+      password
+    }).then(res => res.data),
+  
+  getCurrentUser: (): Promise<User> =>
+    api.get('/auth/me').then(res => res.data),
+  
+  logout: () => {
+    localStorage.removeItem('access_token');
+  }
+};
 
 export const dashboardAPI = {
   getDashboard: (): Promise<DashboardData> =>

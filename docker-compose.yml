@@ -1,4 +1,28 @@
 services:
+  # Migration service - runs once to setup database
+  migrate:
+    build: ./backend
+    container_name: tg_migrate
+    env_file: .env
+    environment:
+      - RUN_MIGRATIONS=true
+    command: python migrate_add_auth.py
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: "no"
+    profiles:
+      - migrate
+
+  frontend:
+    build: ./frontend
+    container_name: tg_frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      - api
+    restart: unless-stopped
+
   api:
     build: ./backend
     container_name: tg_api

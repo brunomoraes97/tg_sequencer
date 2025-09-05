@@ -1,20 +1,27 @@
 services:
+  # Migration service - runs once to setup database
   migrate:
     build: ./backend
-    container_name: tg_migrate_dev
+    container_name: tg_migrate
     env_file: .env
     environment:
-      - DB_HOST=db
-      - DB_PORT=5432
+      - RUN_MIGRATIONS=true
     command: python migrate_add_auth.py
     depends_on:
       db:
         condition: service_healthy
-    volumes:
-      - ./backend:/app
     restart: "no"
     profiles:
       - migrate
+
+  frontend:
+    build: ./frontend
+    container_name: tg_frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      - api
+    restart: unless-stopped
 
   api:
     build: ./backend
@@ -22,13 +29,17 @@ services:
     env_file: .env
     ports:
       - "8000:8000"
-    command: python -m uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+    command: python -m uvicorn main:app --host 0.0.0.0 --port 8000
     depends_on:
       db:
         condition: service_healthy
-    volumes:
-      - ./backend:/app
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
 
   worker:
     build: ./backend
@@ -38,8 +49,6 @@ services:
     depends_on:
       db:
         condition: service_healthy
-    volumes:
-      - ./backend:/app
     restart: unless-stopped
 
   db:
@@ -52,7 +61,7 @@ services:
     volumes:
       - pgdata:/var/lib/postgresql/data
     ports:
-      - "5433:5432"
+      - "5432:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
       interval: 5s

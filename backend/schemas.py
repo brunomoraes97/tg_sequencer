@@ -1,6 +1,31 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, EmailStr
 from typing import Optional, List
 from datetime import datetime
+
+# Auth schemas
+class UserCreate(BaseModel):
+    email: EmailStr
+    password: str
+
+class UserLogin(BaseModel):
+    email: EmailStr
+    password: str
+
+class UserResponse(BaseModel):
+    id: str
+    email: str
+    is_active: bool
+    created_at: Optional[datetime]
+    
+    class Config:
+        from_attributes = True
+
+class Token(BaseModel):
+    access_token: str
+    token_type: str
+
+class TokenData(BaseModel):
+    email: Optional[str] = None
 
 # Account schemas
 class AccountCreate(BaseModel):
@@ -18,6 +43,7 @@ class AccountVerify(BaseModel):
 
 class AccountResponse(BaseModel):
     id: str
+    user_id: str
     phone: str
     name: Optional[str] = None
     tag: Optional[str] = None
@@ -54,6 +80,7 @@ class CampaignUpdate(BaseModel):
 
 class CampaignResponse(BaseModel):
     id: str
+    user_id: str
     account_id: str
     name: str
     interval_seconds: int
@@ -89,6 +116,7 @@ class UserInfo(BaseModel):
 
 class ContactResponse(BaseModel):
     id: str
+    user_id: str
     account_id: str
     campaign_id: Optional[str] = None
     telegram_user_id: int

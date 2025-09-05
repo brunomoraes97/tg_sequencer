@@ -51,7 +51,13 @@ async def send_followups_for_account(account: Account):
                     await client.send_message(c.telegram_user_id, msg)
                     c.current_step += 1
                     c.last_message_at = datetime.utcnow()
-                    db.add(MessageLog(id=uuid_str(), account_id=account.id, contact_id=c.id, step_number=c.current_step-1))
+                    db.add(MessageLog(
+                        id=uuid_str(), 
+                        user_id=account.user_id,
+                        account_id=account.id, 
+                        contact_id=c.id, 
+                        step_number=c.current_step-1
+                    ))
                     db.commit()
                 except Exception as e:
                     # log or mark error; keep going

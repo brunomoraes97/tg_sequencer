@@ -1,7 +1,8 @@
 from __future__ import annotations
 import os, uuid
-from fastapi import FastAPI, Depends, HTTPException
+from fastapi import FastAPI, Depends, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 from sqlalchemy import select, delete
 from datetime import datetime, timedelta
@@ -9,9 +10,16 @@ from typing import List
 
 # Use absolute imports
 from db import SessionLocal
-from models import Account, Campaign, CampaignStep, Contact, MessageLog
+from models import User, Account, Campaign, CampaignStep, Contact, MessageLog
 from telethon_manager import MANAGER
 from schemas import *
+from auth import (
+    get_password_hash, 
+    verify_password, 
+    create_access_token, 
+    get_current_active_user, 
+    ACCESS_TOKEN_EXPIRE_MINUTES
+)
 
 app = FastAPI(title="Telegram Follow-up API", version="1.0.0")
 
@@ -32,15 +40,70 @@ def get_db():
     finally:
         db.close()
 
+# Auth endpoints
+@app.post("/api/auth/register", response_model=UserResponse)
+async def register(user_data: UserCreate, db: Session = Depends(get_db)):
+    """Register a new user"""
+    # Check if user already exists
+    existing_user = db.execute(select(User).where(User.email == user_data.email)).scalar_one_or_none()
+    if existing_user:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Email already registered"
+        )
+    
+    # Create new user
+    hashed_password = get_password_hash(user_data.password)
+    user = User(
+        id=str(uuid.uuid4()),
+        email=user_data.email,
+        hashed_password=hashed_password
+    )
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+    
+    return UserResponse.model_validate(user)
+
+@app.post("/api/auth/login", response_model=Token)
+async def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
+    """Login user and return access token"""
+    user = db.execute(select(User).where(User.email == form_data.username)).scalar_one_or_none()
+    
+    if not user or not verify_password(form_data.password, user.hashed_password):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect email or password",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    
+    if not user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Inactive user"
+        )
+    
+    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    access_token = create_access_token(
+        data={"sub": user.email}, expires_delta=access_token_expires
+    )
+    
+    return {"access_token": access_token, "token_type": "bearer"}
+
+@app.get("/api/auth/me", response_model=UserResponse)
+async def get_current_user_info(current_user: User = Depends(get_current_active_user)):
+    """Get current user information"""
+    return UserResponse.model_validate(current_user)
+
 # Dashboard endpoint
 @app.get("/api/dashboard", response_model=DashboardResponse)
-async def get_dashboard(db: Session = Depends(get_db)):
-    """Get complete dashboard data with enriched contact information"""
+async def get_dashboard(current_user: User = Depends(get_current_active_user), db: Session = Depends(get_db)):
+    """Get complete dashboard data with enriched contact information for current user"""
     
-    # Get basic data
-    accounts = db.execute(select(Account)).scalars().all()
-    campaigns = db.execute(select(Campaign)).scalars().all()
-    contacts = db.execute(select(Contact)).scalars().all()
+    # Get data filtered by user
+    accounts = db.execute(select(Account).where(Account.user_id == current_user.id)).scalars().all()
+    campaigns = db.execute(select(Campaign).where(Campaign.user_id == current_user.id)).scalars().all()
+    contacts = db.execute(select(Contact).where(Contact.user_id == current_user.id)).scalars().all()
     
     # Enrich contacts with user info and next message time
     enriched_contacts = []
@@ -50,6 +113,7 @@ async def get_dashboard(db: Session = Depends(get_db)):
         if not account or account.status != "active":
             enriched_contacts.append(ContactResponse(
                 id=contact.id,
+                user_id=contact.user_id,
                 account_id=contact.account_id,
                 telegram_user_id=contact.telegram_user_id,
                 name=contact.name,
@@ -87,6 +151,7 @@ async def get_dashboard(db: Session = Depends(get_db)):
             
         enriched_contacts.append(ContactResponse(
             id=contact.id,
+            user_id=contact.user_id,
             account_id=contact.account_id,
             telegram_user_id=contact.telegram_user_id,
             name=contact.name,
@@ -99,53 +164,68 @@ async def get_dashboard(db: Session = Depends(get_db)):
         ))
     
     return DashboardResponse(
-        accounts=[AccountResponse.from_orm(acc) for acc in accounts],
-        campaigns=[CampaignResponse.from_orm(camp) for camp in campaigns],
+        accounts=[AccountResponse.model_validate(acc) for acc in accounts],
+        campaigns=[CampaignResponse.model_validate(camp) for camp in campaigns],
         contacts=enriched_contacts
     )
 
 # Account endpoints
 @app.post("/api/accounts", response_model=AccountResponse)
-async def create_account(account_data: AccountCreate, db: Session = Depends(get_db)):
+async def create_account(account_data: AccountCreate, current_user: User = Depends(get_current_active_user), db: Session = Depends(get_db)):
     """Create new account and send verification code"""
-    acc = Account(id=str(uuid.uuid4()), phone=account_data.phone, status="pending_code")
+    acc = Account(
+        id=str(uuid.uuid4()), 
+        user_id=current_user.id,
+        phone=account_data.phone, 
+        status="pending_code"
+    )
     db.add(acc)
     db.commit()
     
     try:
         await MANAGER.send_code(acc.id, acc.phone)
-        return AccountResponse.from_orm(acc)
+        return AccountResponse.model_validate(acc)
     except Exception as e:
         db.delete(acc)
         db.commit()
         raise HTTPException(500, f"Error sending code: {str(e)}")
 
 @app.post("/api/accounts/{account_id}/verify", response_model=AccountResponse)
-async def verify_account(account_id: str, verify_data: AccountVerify, db: Session = Depends(get_db)):
+async def verify_account(account_id: str, verify_data: AccountVerify, current_user: User = Depends(get_current_active_user), db: Session = Depends(get_db)):
     """Verify account with SMS code"""
-    acc = db.get(Account, account_id)
+    print(f"Verifying account {account_id} for user {current_user.id}")
+    print(f"Verify data: code={verify_data.code}, password={'***' if verify_data.password else None}")
+    
+    acc = db.execute(select(Account).where(Account.id == account_id, Account.user_id == current_user.id)).scalar_one_or_none()
     if not acc:
+        print(f"Account not found: {account_id}")
         raise HTTPException(404, "Account not found")
     
+    print(f"Found account: {acc.phone}, status: {acc.status}")
+    
     try:
-        session_str = await MANAGER.verify_code(acc.id, verify_data.code, verify_data.password)
+        session_str = await MANAGER.verify_code(acc, verify_data.code, verify_data.password)
         acc.string_session = session_str
         acc.status = "active"
         db.commit()
-        return AccountResponse.from_orm(acc)
+        print(f"Verification successful for account {account_id}")
+        return AccountResponse.model_validate(acc)
     except Exception as e:
+        print(f"Verification failed for account {account_id}: {str(e)}")
+        import traceback
+        traceback.print_exc()
         raise HTTPException(400, f"Verification failed: {str(e)}")
 
 @app.get("/api/accounts", response_model=List[AccountResponse])
-def get_accounts(db: Session = Depends(get_db)):
-    """Get all accounts"""
-    accounts = db.execute(select(Account)).scalars().all()
-    return [AccountResponse.from_orm(acc) for acc in accounts]
+def get_accounts(current_user: User = Depends(get_current_active_user), db: Session = Depends(get_db)):
+    """Get all accounts for current user"""
+    accounts = db.execute(select(Account).where(Account.user_id == current_user.id)).scalars().all()
+    return [AccountResponse.model_validate(acc) for acc in accounts]
 
 @app.put("/api/accounts/{account_id}", response_model=AccountResponse)
-def update_account(account_id: str, account_data: AccountUpdate, db: Session = Depends(get_db)):
+def update_account(account_id: str, account_data: AccountUpdate, current_user: User = Depends(get_current_active_user), db: Session = Depends(get_db)):
     """Update account name and tag"""
-    acc = db.get(Account, account_id)
+    acc = db.execute(select(Account).where(Account.id == account_id, Account.user_id == current_user.id)).scalar_one_or_none()
     if not acc:
         raise HTTPException(404, "Account not found")
     
@@ -155,17 +235,17 @@ def update_account(account_id: str, account_data: AccountUpdate, db: Session = D
         acc.tag = account_data.tag
     acc.updated_at = datetime.utcnow()
     db.commit()
-    return AccountResponse.from_orm(acc)
+    return AccountResponse.model_validate(acc)
 
 @app.delete("/api/accounts/{account_id}")
-def delete_account(account_id: str, db: Session = Depends(get_db)):
+def delete_account(account_id: str, current_user: User = Depends(get_current_active_user), db: Session = Depends(get_db)):
     """Delete account and all related data"""
-    acc = db.get(Account, account_id)
+    acc = db.execute(select(Account).where(Account.id == account_id, Account.user_id == current_user.id)).scalar_one_or_none()
     if not acc:
         raise HTTPException(404, "Account not found")
     
     # Delete related campaigns and contacts
-    campaigns = db.execute(select(Campaign).where(Campaign.account_id == account_id)).scalars().all()
+    campaigns = db.execute(select(Campaign).where(Campaign.account_id == account_id, Campaign.user_id == current_user.id)).scalars().all()
     for campaign in campaigns:
         # Delete campaign steps
         steps = db.execute(select(CampaignStep).where(CampaignStep.campaign_id == campaign.id)).scalars().all()
@@ -174,7 +254,7 @@ def delete_account(account_id: str, db: Session = Depends(get_db)):
         db.delete(campaign)
     
     # Delete contacts
-    contacts = db.execute(select(Contact).where(Contact.account_id == account_id)).scalars().all()
+    contacts = db.execute(select(Contact).where(Contact.account_id == account_id, Contact.user_id == current_user.id)).scalars().all()
     for contact in contacts:
         db.delete(contact)
     
@@ -184,10 +264,16 @@ def delete_account(account_id: str, db: Session = Depends(get_db)):
 
 # Campaign endpoints
 @app.post("/api/campaigns", response_model=CampaignResponse)
-def create_campaign(campaign_data: CampaignCreate, db: Session = Depends(get_db)):
+def create_campaign(campaign_data: CampaignCreate, current_user: User = Depends(get_current_active_user), db: Session = Depends(get_db)):
     """Create new campaign"""
+    # Verify account belongs to current user
+    account = db.execute(select(Account).where(Account.id == campaign_data.account_id, Account.user_id == current_user.id)).scalar_one_or_none()
+    if not account:
+        raise HTTPException(404, "Account not found")
+    
     camp = Campaign(
         id=str(uuid.uuid4()),
+        user_id=current_user.id,
         account_id=campaign_data.account_id,
         name=campaign_data.name,
         interval_seconds=campaign_data.interval_seconds,
@@ -195,18 +281,18 @@ def create_campaign(campaign_data: CampaignCreate, db: Session = Depends(get_db)
     )
     db.add(camp)
     db.commit()
-    return CampaignResponse.from_orm(camp)
+    return CampaignResponse.model_validate(camp)
 
 @app.get("/api/campaigns", response_model=List[CampaignResponse])
-def get_campaigns(db: Session = Depends(get_db)):
-    """Get all campaigns with steps"""
-    campaigns = db.execute(select(Campaign)).scalars().all()
-    return [CampaignResponse.from_orm(camp) for camp in campaigns]
+def get_campaigns(current_user: User = Depends(get_current_active_user), db: Session = Depends(get_db)):
+    """Get all campaigns with steps for current user"""
+    campaigns = db.execute(select(Campaign).where(Campaign.user_id == current_user.id)).scalars().all()
+    return [CampaignResponse.model_validate(camp) for camp in campaigns]
 
 @app.put("/api/campaigns/{campaign_id}", response_model=CampaignResponse)
-def update_campaign(campaign_id: str, campaign_data: CampaignUpdate, db: Session = Depends(get_db)):
+def update_campaign(campaign_id: str, campaign_data: CampaignUpdate, current_user: User = Depends(get_current_active_user), db: Session = Depends(get_db)):
     """Update campaign"""
-    camp = db.get(Campaign, campaign_id)
+    camp = db.execute(select(Campaign).where(Campaign.id == campaign_id, Campaign.user_id == current_user.id)).scalar_one_or_none()
     if not camp:
         raise HTTPException(404, "Campaign not found")
     
@@ -218,15 +304,19 @@ def update_campaign(campaign_id: str, campaign_data: CampaignUpdate, db: Session
     if campaign_data.active is not None:
         camp.active = campaign_data.active
     if campaign_data.account_id is not None:
+        # Verify new account belongs to current user
+        account = db.execute(select(Account).where(Account.id == campaign_data.account_id, Account.user_id == current_user.id)).scalar_one_or_none()
+        if not account:
+            raise HTTPException(400, "Account not found or doesn't belong to you")
         camp.account_id = campaign_data.account_id
     
     db.commit()
-    return CampaignResponse.from_orm(camp)
+    return CampaignResponse.model_validate(camp)
 
 @app.delete("/api/campaigns/{campaign_id}")
-def delete_campaign(campaign_id: str, db: Session = Depends(get_db)):
+def delete_campaign(campaign_id: str, current_user: User = Depends(get_current_active_user), db: Session = Depends(get_db)):
     """Delete campaign and all its steps"""
-    camp = db.get(Campaign, campaign_id)
+    camp = db.execute(select(Campaign).where(Campaign.id == campaign_id, Campaign.user_id == current_user.id)).scalar_one_or_none()
     if not camp:
         raise HTTPException(404, "Campaign not found")
     
@@ -240,16 +330,21 @@ def delete_campaign(campaign_id: str, db: Session = Depends(get_db)):
     return {"message": "Campaign deleted successfully"}
 
 @app.get("/api/campaigns/{campaign_id}", response_model=CampaignResponse)
-def get_campaign(campaign_id: str, db: Session = Depends(get_db)):
+def get_campaign(campaign_id: str, current_user: User = Depends(get_current_active_user), db: Session = Depends(get_db)):
     """Get specific campaign with steps"""
-    camp = db.get(Campaign, campaign_id)
+    camp = db.execute(select(Campaign).where(Campaign.id == campaign_id, Campaign.user_id == current_user.id)).scalar_one_or_none()
     if not camp:
         raise HTTPException(404, "Campaign not found")
-    return CampaignResponse.from_orm(camp)
+    return CampaignResponse.model_validate(camp)
 
 @app.post("/api/campaigns/{campaign_id}/steps", response_model=CampaignStepResponse)
-def add_campaign_step(campaign_id: str, step_data: CampaignStepCreate, db: Session = Depends(get_db)):
+def add_campaign_step(campaign_id: str, step_data: CampaignStepCreate, current_user: User = Depends(get_current_active_user), db: Session = Depends(get_db)):
     """Add step to campaign"""
+    # Verify campaign belongs to current user
+    campaign = db.execute(select(Campaign).where(Campaign.id == campaign_id, Campaign.user_id == current_user.id)).scalar_one_or_none()
+    if not campaign:
+        raise HTTPException(404, "Campaign not found")
+    
     step = CampaignStep(
         id=str(uuid.uuid4()),
         campaign_id=campaign_id,
@@ -258,11 +353,16 @@ def add_campaign_step(campaign_id: str, step_data: CampaignStepCreate, db: Sessi
     )
     db.add(step)
     db.commit()
-    return CampaignStepResponse.from_orm(step)
+    return CampaignStepResponse.model_validate(step)
 
 @app.put("/api/campaigns/{campaign_id}/steps/{step_id}", response_model=CampaignStepResponse)
-def update_campaign_step(campaign_id: str, step_id: str, step_data: CampaignStepCreate, db: Session = Depends(get_db)):
+def update_campaign_step(campaign_id: str, step_id: str, step_data: CampaignStepCreate, current_user: User = Depends(get_current_active_user), db: Session = Depends(get_db)):
     """Update campaign step"""
+    # Verify campaign belongs to current user
+    campaign = db.execute(select(Campaign).where(Campaign.id == campaign_id, Campaign.user_id == current_user.id)).scalar_one_or_none()
+    if not campaign:
+        raise HTTPException(404, "Campaign not found")
+    
     step = db.get(CampaignStep, step_id)
     if not step or step.campaign_id != campaign_id:
         raise HTTPException(404, "Step not found")
@@ -270,11 +370,16 @@ def update_campaign_step(campaign_id: str, step_id: str, step_data: CampaignStep
     step.step_number = step_data.step_number
     step.message = step_data.message
     db.commit()
-    return CampaignStepResponse.from_orm(step)
+    return CampaignStepResponse.model_validate(step)
 
 @app.delete("/api/campaigns/{campaign_id}/steps/{step_id}")
-def delete_campaign_step(campaign_id: str, step_id: str, db: Session = Depends(get_db)):
+def delete_campaign_step(campaign_id: str, step_id: str, current_user: User = Depends(get_current_active_user), db: Session = Depends(get_db)):
     """Delete campaign step"""
+    # Verify campaign belongs to current user
+    campaign = db.execute(select(Campaign).where(Campaign.id == campaign_id, Campaign.user_id == current_user.id)).scalar_one_or_none()
+    if not campaign:
+        raise HTTPException(404, "Campaign not found")
+    
     step = db.get(CampaignStep, step_id)
     if not step or step.campaign_id != campaign_id:
         raise HTTPException(404, "Step not found")
@@ -284,10 +389,10 @@ def delete_campaign_step(campaign_id: str, step_id: str, db: Session = Depends(g
     return {"message": "Step deleted successfully"}
 
 @app.post("/api/campaigns/{campaign_id}/contacts/{contact_id}")
-def assign_contact_to_campaign(campaign_id: str, contact_id: str, db: Session = Depends(get_db)):
+def assign_contact_to_campaign(campaign_id: str, contact_id: str, current_user: User = Depends(get_current_active_user), db: Session = Depends(get_db)):
     """Assign contact to campaign"""
-    campaign = db.get(Campaign, campaign_id)
-    contact = db.get(Contact, contact_id)
+    campaign = db.execute(select(Campaign).where(Campaign.id == campaign_id, Campaign.user_id == current_user.id)).scalar_one_or_none()
+    contact = db.execute(select(Contact).where(Contact.id == contact_id, Contact.user_id == current_user.id)).scalar_one_or_none()
     
     if not campaign:
         raise HTTPException(404, "Campaign not found")
@@ -305,10 +410,15 @@ def assign_contact_to_campaign(campaign_id: str, contact_id: str, db: Session = 
     return {"message": "Contact assigned to campaign successfully"}
 
 @app.delete("/api/campaigns/{campaign_id}/contacts/{contact_id}")
-def remove_contact_from_campaign(campaign_id: str, contact_id: str, db: Session = Depends(get_db)):
+def remove_contact_from_campaign(campaign_id: str, contact_id: str, current_user: User = Depends(get_current_active_user), db: Session = Depends(get_db)):
     """Remove contact from campaign"""
-    contact = db.get(Contact, contact_id)
-    if not contact or contact.campaign_id != campaign_id:
+    # Verify campaign belongs to current user
+    campaign = db.execute(select(Campaign).where(Campaign.id == campaign_id, Campaign.user_id == current_user.id)).scalar_one_or_none()
+    if not campaign:
+        raise HTTPException(404, "Campaign not found")
+    
+    contact = db.execute(select(Contact).where(Contact.id == contact_id, Contact.user_id == current_user.id, Contact.campaign_id == campaign_id)).scalar_one_or_none()
+    if not contact:
         raise HTTPException(404, "Contact not found in this campaign")
     
     contact.campaign_id = None
@@ -318,12 +428,18 @@ def remove_contact_from_campaign(campaign_id: str, contact_id: str, db: Session 
 
 # Contact endpoints
 @app.post("/api/contacts", response_model=ContactResponse)
-async def create_contact(contact_data: ContactCreate, db: Session = Depends(get_db)):
+async def create_contact(contact_data: ContactCreate, current_user: User = Depends(get_current_active_user), db: Session = Depends(get_db)):
     """Create contact by resolving username or phone to Telegram user ID"""
-    # Get account
-    account = db.get(Account, contact_data.account_id)
+    # Get account and verify it belongs to current user
+    account = db.execute(select(Account).where(Account.id == contact_data.account_id, Account.user_id == current_user.id)).scalar_one_or_none()
     if not account:
         raise HTTPException(404, "Account not found")
+    
+    # Verify campaign belongs to current user if specified
+    if contact_data.campaign_id:
+        campaign = db.execute(select(Campaign).where(Campaign.id == contact_data.campaign_id, Campaign.user_id == current_user.id)).scalar_one_or_none()
+        if not campaign:
+            raise HTTPException(404, "Campaign not found")
     
     try:
         # Resolve identifier to user ID
@@ -332,6 +448,7 @@ async def create_contact(contact_data: ContactCreate, db: Session = Depends(get_
         # Create contact
         contact = Contact(
             id=str(uuid.uuid4()),
+            user_id=current_user.id,
             account_id=contact_data.account_id,
             campaign_id=contact_data.campaign_id,
             telegram_user_id=telegram_user_id,
@@ -341,7 +458,7 @@ async def create_contact(contact_data: ContactCreate, db: Session = Depends(get_
         db.add(contact)
         db.commit()
         
-        return ContactResponse.from_orm(contact)
+        return ContactResponse.model_validate(contact)
         
     except ValueError as e:
         raise HTTPException(400, str(e))
@@ -349,15 +466,15 @@ async def create_contact(contact_data: ContactCreate, db: Session = Depends(get_
         raise HTTPException(500, f"Error creating contact: {str(e)}")
 
 @app.get("/api/contacts", response_model=List[ContactResponse])
-def get_contacts(db: Session = Depends(get_db)):
-    """Get all contacts"""
-    contacts = db.execute(select(Contact)).scalars().all()
-    return [ContactResponse.from_orm(contact) for contact in contacts]
+def get_contacts(current_user: User = Depends(get_current_active_user), db: Session = Depends(get_db)):
+    """Get all contacts for current user"""
+    contacts = db.execute(select(Contact).where(Contact.user_id == current_user.id)).scalars().all()
+    return [ContactResponse.model_validate(contact) for contact in contacts]
 
 @app.put("/api/contacts/{contact_id}", response_model=ContactResponse)
-def update_contact(contact_id: str, contact_data: ContactUpdate, db: Session = Depends(get_db)):
+def update_contact(contact_id: str, contact_data: ContactUpdate, current_user: User = Depends(get_current_active_user), db: Session = Depends(get_db)):
     """Update contact name, tag and campaign assignment"""
-    contact = db.get(Contact, contact_id)
+    contact = db.execute(select(Contact).where(Contact.id == contact_id, Contact.user_id == current_user.id)).scalar_one_or_none()
     if not contact:
         raise HTTPException(404, "Contact not found")
     
@@ -366,9 +483,9 @@ def update_contact(contact_id: str, contact_data: ContactUpdate, db: Session = D
     if contact_data.tag is not None:
         contact.tag = contact_data.tag
     if contact_data.campaign_id is not None:
-        # Verify campaign belongs to same account
+        # Verify campaign belongs to current user and same account
         if contact_data.campaign_id:
-            campaign = db.get(Campaign, contact_data.campaign_id)
+            campaign = db.execute(select(Campaign).where(Campaign.id == contact_data.campaign_id, Campaign.user_id == current_user.id)).scalar_one_or_none()
             if not campaign or campaign.account_id != contact.account_id:
                 raise HTTPException(400, "Campaign not found or doesn't belong to the same account")
         contact.campaign_id = contact_data.campaign_id
@@ -379,17 +496,17 @@ def update_contact(contact_id: str, contact_data: ContactUpdate, db: Session = D
             contact.last_message_at = None
     
     db.commit()
-    return ContactResponse.from_orm(contact)
+    return ContactResponse.model_validate(contact)
 
 @app.delete("/api/contacts/{contact_id}")
-def delete_contact(contact_id: str, db: Session = Depends(get_db)):
+def delete_contact(contact_id: str, current_user: User = Depends(get_current_active_user), db: Session = Depends(get_db)):
     """Delete contact"""
-    contact = db.get(Contact, contact_id)
+    contact = db.execute(select(Contact).where(Contact.id == contact_id, Contact.user_id == current_user.id)).scalar_one_or_none()
     if not contact:
         raise HTTPException(404, "Contact not found")
     
     # Delete related messages first
-    db.execute(delete(MessageLog).where(MessageLog.contact_id == contact_id))
+    db.execute(delete(MessageLog).where(MessageLog.contact_id == contact_id, MessageLog.user_id == current_user.id))
     
     # Delete the contact
     db.delete(contact)

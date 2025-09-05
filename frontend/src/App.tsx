@@ -9,19 +9,23 @@ import CampaignFormPage from './components/CampaignFormPage';
 import CampaignEditPage from './components/CampaignEditPage';
 import ContactsPage from './components/ContactsPage';
 import HelpPage from './components/HelpPage';
+import AuthPage from './components/AuthPage';
+import UserMenu from './components/UserMenu';
 import { ToastProvider } from './contexts/ToastContext';
+import { AuthProvider, useAuth } from './contexts/AuthContext';
 
 type View = 'dashboard' | 'accounts' | 'campaigns' | 'campaign-form' | 'campaign-edit' | 'contacts' | 'help';
 
-function App() {
+const AppContent: React.FC = () => {
+  const { isAuthenticated, loading } = useAuth();
   const [view, setView] = useState<View>('dashboard');
   const [editingCampaignId, setEditingCampaignId] = useState<string | null>(null);
   const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [dataLoading, setDataLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const loadDashboard = async () => {
-    setLoading(true);
+    setDataLoading(true);
     setError(null);
     try {
       const data = await dashboardAPI.getDashboard();
@@ -29,13 +33,15 @@ function App() {
     } catch (err: any) {
       setError(err.response?.data?.detail || 'Error loading dashboard');
     } finally {
-      setLoading(false);
+      setDataLoading(false);
     }
   };
 
   useEffect(() => {
-    loadDashboard();
-  }, []);
+    if (isAuthenticated) {
+      loadDashboard();
+    }
+  }, [isAuthenticated]);
 
   const handleCampaignFormSuccess = () => {
     setView('campaigns');
@@ -46,44 +52,66 @@ function App() {
     setView('campaigns');
   };
 
+  if (loading) {
+    return (
+      <div style={{ 
+        display: 'flex', 
+        justifyContent: 'center', 
+        alignItems: 'center', 
+        height: '100vh',
+        fontSize: '1.2rem'
+      }}>
+        ⏳ Carregando...
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return <AuthPage />;
+  }
+
   return (
-    <ToastProvider>
-      <div className="App">
+    <div className="App">
       {view !== 'campaign-form' && (
         <header className="App-header">
-          <h1>🚀 Telegram Follow-up System</h1>
-          <nav>
-            <button 
-              onClick={() => setView('dashboard')}
-              className={view === 'dashboard' ? 'active' : ''}
-            >
-              📊 Dashboard
-            </button>
-            <button 
-              onClick={() => setView('accounts')}
-              className={view === 'accounts' ? 'active' : ''}
-            >
-              📞 Accounts
-            </button>
-            <button 
-              onClick={() => setView('campaigns')}
-              className={view === 'campaigns' ? 'active' : ''}
-            >
-              🎯 Campaigns
-            </button>
-            <button 
-              onClick={() => setView('contacts')}
-              className={view === 'contacts' ? 'active' : ''}
-            >
-              👥 Contacts
-            </button>
-            <button 
-              onClick={() => setView('help')}
-              className={view === 'help' ? 'active' : ''}
-            >
-              ❓ Help
-            </button>
-          </nav>
+          <div style={{ display: 'flex', alignItems: 'center', width: '100%' }}>
+            <div style={{ flex: 1 }}>
+              <h1>🚀 Telegram Follow-up System</h1>
+              <nav>
+                <button 
+                  onClick={() => setView('dashboard')}
+                  className={view === 'dashboard' ? 'active' : ''}
+                >
+                  📊 Dashboard
+                </button>
+                <button 
+                  onClick={() => setView('accounts')}
+                  className={view === 'accounts' ? 'active' : ''}
+                >
+                  📞 Accounts
+                </button>
+                <button 
+                  onClick={() => setView('campaigns')}
+                  className={view === 'campaigns' ? 'active' : ''}
+                >
+                  🎯 Campaigns
+                </button>
+                <button 
+                  onClick={() => setView('contacts')}
+                  className={view === 'contacts' ? 'active' : ''}
+                >
+                  👥 Contacts
+                </button>
+                <button 
+                  onClick={() => setView('help')}
+                  className={view === 'help' ? 'active' : ''}
+                >
+                  ❓ Help
+                </button>
+              </nav>
+            </div>
+            <UserMenu />
+          </div>
         </header>
       )}
 
@@ -95,7 +123,7 @@ function App() {
           </div>
         )}
 
-        {loading && <div className="loading">⏳ Loading...</div>}
+        {dataLoading && <div className="loading">⏳ Loading...</div>}
 
         {view === 'dashboard' && dashboardData && (
           <Dashboard data={dashboardData} onRefresh={loadDashboard} />
@@ -129,8 +157,17 @@ function App() {
         {view === 'contacts' && <ContactsPage />}
         {view === 'help' && <HelpPage />}
       </main>
-      </div>
-    </ToastProvider>
+    </div>
+  );
+};
+
+function App() {
+  return (
+    <AuthProvider>
+      <ToastProvider>
+        <AppContent />
+      </ToastProvider>
+    </AuthProvider>
   );
 }
 
