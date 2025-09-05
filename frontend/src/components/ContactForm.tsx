@@ -8,14 +8,14 @@ interface ContactFormProps {
 }
 
 const ContactForm: React.FC<ContactFormProps> = ({ accounts, onSuccess, onCancel }) => {
-  const [accountId, setAccountId] = useState('');
+  const activeAccounts = accounts.filter(acc => acc.status === 'active');
+
+  const [accountId, setAccountId] = useState(activeAccounts.length > 0 ? activeAccounts[0].id : '');
   const [identifier, setIdentifier] = useState('');
   const [name, setName] = useState('');
   const [tag, setTag] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  const activeAccounts = accounts.filter(acc => acc.status === 'active');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -23,15 +23,29 @@ const ContactForm: React.FC<ContactFormProps> = ({ accounts, onSuccess, onCancel
     setError(null);
     
     try {
+      if (!accountId) {
+        setError("Please select an account.");
+        setLoading(false);
+        return;
+      }
       await contactsAPI.createContact({
         account_id: accountId,
         identifier: identifier.trim(),
-        name: name || undefined,
-        tag: tag || undefined,
+        name: name.trim() || undefined,
+        tag: tag.trim() || undefined,
       });
       onSuccess();
     } catch (err: any) {
-      setError(err.response?.data?.detail || 'Error creating contact');
+      if (err.response && err.response.data && err.response.data.detail) {
+        if (Array.isArray(err.response.data.detail)) {
+          const errorMsg = err.response.data.detail.map((d: any) => `${d.loc.length > 1 ? d.loc[1] : 'Error'}: ${d.msg}`).join(', ');
+          setError(errorMsg);
+        } else {
+          setError(err.response.data.detail);
+        }
+      } else {
+        setError('Error creating contact. Please try again.');
+      }
     } finally {
       setLoading(false);
     }

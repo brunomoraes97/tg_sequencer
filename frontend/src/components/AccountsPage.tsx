@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { accountsAPI, Account } from '../api';
+import { useAuth } from '../contexts/AuthContext';
 import AccountForm from './AccountForm';
 
 const AccountsPage: React.FC = () => {
+  const { user } = useAuth();
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [loading, setLoading] = useState(false);
   const [showCreateForm, setShowCreateForm] = useState(false);
@@ -20,8 +22,12 @@ const AccountsPage: React.FC = () => {
   };
 
   useEffect(() => {
-    loadAccounts();
-  }, []);
+    if (user) {
+      loadAccounts();
+    } else {
+      setAccounts([]);
+    }
+  }, [user]);
 
   if (loading) {
     return (

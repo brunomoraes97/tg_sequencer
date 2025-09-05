@@ -84,9 +84,22 @@ class TelethonManager:
         async with self._lock:
             if account.id in self.clients:
                 return self.clients[account.id]
-            # decrypt and start client
-            session_str = _xor(account.string_session or "", SESSION_SECRET)
-            client = await self._create_client_from_session(session_str)
+            # Resolve session and start client
+            session_raw = account.string_session
+            if not session_raw:
+                raise ValueError("Account is not verified yet. Please verify this account before using it.")
+
+            # 1) Try as-is (covers plain Telethon StringSession strings)
+            try:
+                client = await self._create_client_from_session(session_raw)
+            except Exception:
+                # 2) Fallback to our encoded storage format
+                try:
+                    decoded = _xor(session_raw, SESSION_SECRET)
+                    client = await self._create_client_from_session(decoded)
+                except Exception as e:
+                    raise ValueError("Invalid session stored for this account. Please re-verify the account.") from e
+
             self.clients[account.id] = client
             return client
 

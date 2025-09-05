@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { campaignsAPI, accountsAPI, contactsAPI, Campaign, Account, Contact, CampaignStep } from '../api';
+import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../contexts/ToastContext';
 import Alert from './Alert';
 
@@ -9,6 +10,7 @@ interface CampaignsPageProps {
 }
 
 const CampaignsPage: React.FC<CampaignsPageProps> = ({ onCreateCampaign, onEditCampaign }) => {
+  const { user } = useAuth();
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [contacts, setContacts] = useState<Contact[]>([]);
@@ -21,10 +23,16 @@ const CampaignsPage: React.FC<CampaignsPageProps> = ({ onCreateCampaign, onEditC
   const { showSuccess, showError } = useToast();
 
   useEffect(() => {
-    loadCampaigns();
-    loadAccounts();
-    loadContacts();
-  }, []);
+    if (user) {
+      loadCampaigns();
+      loadAccounts();
+      loadContacts();
+    } else {
+      setCampaigns([]);
+      setAccounts([]);
+      setContacts([]);
+    }
+  }, [user]);
 
   const loadCampaigns = async () => {
     try {

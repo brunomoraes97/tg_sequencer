@@ -11,7 +11,7 @@ from typing import List
 # Use absolute imports
 from db import SessionLocal
 from models import User, Account, Campaign, CampaignStep, Contact, MessageLog
-from telethon_manager import MANAGER
+from telethon_manager import MANAGER, _xor, SESSION_SECRET
 from schemas import *
 from auth import (
     get_password_hash, 
@@ -205,7 +205,8 @@ async def verify_account(account_id: str, verify_data: AccountVerify, current_us
     
     try:
         session_str = await MANAGER.verify_code(acc, verify_data.code, verify_data.password)
-        acc.string_session = session_str
+        # Store encoded session string for safety/compatibility
+        acc.string_session = _xor(session_str, SESSION_SECRET)
         acc.status = "active"
         db.commit()
         print(f"Verification successful for account {account_id}")
@@ -427,20 +428,39 @@ def remove_contact_from_campaign(campaign_id: str, contact_id: str, current_user
     return {"message": "Contact removed from campaign successfully"}
 
 # Contact endpoints
+@app.get("/api/debug/user-info")
+def debug_user_info(current_user: User = Depends(get_current_active_user), db: Session = Depends(get_db)):
+    """Debug endpoint to show current user and their accounts"""
+    accounts = db.execute(select(Account).where(Account.user_id == current_user.id)).scalars().all()
+    return {
+        "user_id": current_user.id,
+        "user_email": current_user.email,
+        "accounts": [{"id": acc.id, "phone": acc.phone, "status": acc.status} for acc in accounts]
+    }
+
 @app.post("/api/contacts", response_model=ContactResponse)
 async def create_contact(contact_data: ContactCreate, current_user: User = Depends(get_current_active_user), db: Session = Depends(get_db)):
     """Create contact by resolving username or phone to Telegram user ID"""
-    # Get account and verify it belongs to current user
+    # SECURITY: Validate account ownership FIRST - NEVER allow cross-user access
     account = db.execute(select(Account).where(Account.id == contact_data.account_id, Account.user_id == current_user.id)).scalar_one_or_none()
     if not account:
-        raise HTTPException(404, "Account not found")
+        # Log security violation attempt
+        import sys
+        sys.stderr.write(f"SECURITY VIOLATION: User {current_user.id} ({current_user.email}) attempted to use account {contact_data.account_id} that doesn't belong to them\n")
+        sys.stderr.flush()
+        raise HTTPException(status_code=403, detail="Access denied: Account does not belong to current user")
     
     # Verify campaign belongs to current user if specified
     if contact_data.campaign_id:
         campaign = db.execute(select(Campaign).where(Campaign.id == contact_data.campaign_id, Campaign.user_id == current_user.id)).scalar_one_or_none()
         if not campaign:
-            raise HTTPException(404, "Campaign not found")
-    
+            raise HTTPException(status_code=403, detail="Access denied: Campaign does not belong to current user")
+    # Verify campaign belongs to current user if specified
+    if contact_data.campaign_id:
+        campaign = db.execute(select(Campaign).where(Campaign.id == contact_data.campaign_id, Campaign.user_id == current_user.id)).scalar_one_or_none()
+        if not campaign:
+            raise HTTPException(status_code=403, detail="Access denied: Campaign does not belong to current user")
+
     try:
         # Resolve identifier to user ID
         telegram_user_id = await MANAGER.resolve_user_identifier(account, contact_data.identifier.strip())
@@ -461,9 +481,13 @@ async def create_contact(contact_data: ContactCreate, current_user: User = Depen
         return ContactResponse.model_validate(contact)
         
     except ValueError as e:
-        raise HTTPException(400, str(e))
+        # Surface clear session/identifier errors to the client
+        raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
-        raise HTTPException(500, f"Error creating contact: {str(e)}")
+        import sys
+        sys.stderr.write(f"Unexpected error creating contact: {str(e)}\n")
+        sys.stderr.flush()
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 @app.get("/api/contacts", response_model=List[ContactResponse])
 def get_contacts(current_user: User = Depends(get_current_active_user), db: Session = Depends(get_db)):

@@ -1,10 +1,12 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { contactsAPI, Contact, Account, accountsAPI, Campaign, campaignsAPI } from '../api';
+import { useAuth } from '../contexts/AuthContext';
 import ContactForm from './ContactForm';
 import Alert from './Alert';
 import SearchFilters from './SearchFilters';
 
 const ContactsPage: React.FC = () => {
+  const { user } = useAuth();
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
@@ -39,8 +41,16 @@ const ContactsPage: React.FC = () => {
   };
 
   useEffect(() => {
-    loadContacts();
-  }, []);
+    // Only load data if user is authenticated
+    if (user) {
+      loadContacts();
+    } else {
+      // Clear data if user is not authenticated
+      setContacts([]);
+      setAccounts([]);
+      setCampaigns([]);
+    }
+  }, [user]); // Reload when user changes
 
   const handleEdit = (contact: Contact) => {
     setEditingContact(contact);

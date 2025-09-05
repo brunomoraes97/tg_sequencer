@@ -94,7 +94,7 @@ class CampaignResponse(BaseModel):
 # Contact schemas
 class ContactCreate(BaseModel):
     account_id: str
-    identifier: str  # username or phone
+    identifier: str
     name: Optional[str] = None
     tag: Optional[str] = None
     campaign_id: Optional[str] = None
